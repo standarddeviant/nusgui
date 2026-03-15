@@ -33,7 +33,7 @@ pub enum ScanColumns {
     #[strum(to_string = "Name")]
     Name,
     #[strum(to_string = "RSSI")]
-    RSSI,
+    Rssi,
 }
 
 impl ColumnOperations<ScanRow, ScanColumns, ScanConfig> for ScanColumns {
@@ -43,7 +43,7 @@ impl ColumnOperations<ScanRow, ScanColumns, ScanConfig> for ScanColumns {
             // ScanColumns::Id => "".into(), // row.id.to_string(),
             // ScanColumns::Address => row.addr.to_string(),
             ScanColumns::Name => row.name.to_string(),
-            ScanColumns::RSSI => row.rssi.to_string(),
+            ScanColumns::Rssi => row.rssi.to_string(),
         }
     }
     fn create_header(
@@ -79,7 +79,7 @@ impl ColumnOperations<ScanRow, ScanColumns, ScanConfig> for ScanColumns {
             // ScanColumns::Id => format!("{row_id}"), //row_data.id.to_string(),
             // ScanColumns::Address => row_data.addr.to_string(),
             ScanColumns::Name => row_data.name.to_string(),
-            ScanColumns::RSSI => row_data.rssi.to_string(),
+            ScanColumns::Rssi => row_data.rssi.to_string(),
         };
 
         // The same approach works for both cell based selection and for entire row selection on
@@ -105,7 +105,7 @@ impl ColumnOrdering<ScanRow> for ScanColumns {
             // ScanColumns::Id => row_1.id.cmp(&row_2.id),
             // ScanColumns::Address => row_1.addr.cmp(&row_2.addr),
             ScanColumns::Name => row_1.name.cmp(&row_2.name),
-            ScanColumns::RSSI => row_1.rssi.cmp(&row_2.rssi),
+            ScanColumns::Rssi => row_1.rssi.cmp(&row_2.rssi),
         }
     }
 }

@@ -15,8 +15,6 @@ use egui_extras::Column;
 use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
 
-use flume;
-
 mod btnus;
 mod scan_table;
 
@@ -229,13 +227,14 @@ impl NusGui {
                                         if r.1.row_data.bt_id.eq(&Some(scan_obj.device.id())) {
                                             // copy the just-received thread_infos the correct table row correct
                                             // table row data
-                                            r.1.row_data = scan_obj_to_scan_row(&scan_obj);
+                                            r.1.row_data = scan_obj_to_scan_row(scan_obj);
                                             return None; // indicate we modified a row, don't add a new one
                                         }
                                     }
-                                    let scan_row = scan_obj_to_scan_row(&scan_obj);
+
                                     // indicate we didn't find a row to modify, so add this data as a new row
-                                    return Some(scan_row);
+                                    let scan_row = scan_obj_to_scan_row(scan_obj);
+                                    Some(scan_row)
                                 });
                             }
                             self.table.recreate_rows();
@@ -264,10 +263,8 @@ impl NusGui {
             // Use the fill method to set the button's background color to red
             .fill(PEACH32); //
 
-            if AmConnected == self.bt_state {
-                if ui.add(discon_button).clicked() {
-                    let _ = self.cmd_tx.send(DoDisconnect);
-                }
+            if AmConnected == self.bt_state && ui.add(discon_button).clicked() {
+                let _ = self.cmd_tx.send(DoDisconnect);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -461,7 +458,7 @@ impl NusGui {
 
                 if nus_rx_line_input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                     // use trimmed string for history + debug logging
-                    let rx_string = format!("{}", self.nus_rx_single_string.trim()); // clone+trim
+                    let rx_string = self.nus_rx_single_string.trim().to_string(); // clone+trim
                     self.nus_rx_history.push(rx_string.clone());
                     info!("Sending (with bytes): DataRx({})", rx_string);
 

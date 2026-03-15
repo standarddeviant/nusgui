@@ -50,10 +50,10 @@ pub enum ThreadedNusMsg {
     /// NUS RX bytes (BLE write to device)
     DataRx(Vec<u8>),
 
-    /// Not Ready State 
+    /// Not Ready State
     AmNotReady,
 
-    /// Not Ready State 
+    /// Not Ready State
     AmReadyIdle(String),
 
     /// Scanning State
@@ -79,7 +79,7 @@ async fn bt_nus_setup_and_loop(
 ) -> Result<bool, Box<dyn Error>> {
     let mut do_quit = false;
     // make device connection
-    let device = adapter.open_device(&bt_id).await?;
+    let device = adapter.open_device(bt_id).await?;
     adapter.connect_device(&device).await?;
 
     // use device to obtain service
