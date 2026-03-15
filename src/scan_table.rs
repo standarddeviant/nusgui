@@ -8,25 +8,28 @@ use strum_macros::{Display, EnumIter}; // 0.25
 use egui::{Button, Ui};
 
 #[derive(Default, Clone)]
+/// Scan Table Config + State
 pub struct ScanConfig {
-    // counting_ongoing: bool,
+    /// device that should be connected to when clicked in scan table
     pub connect_row_id: Option<i64>,
     pub _connect_dev_id: Option<DeviceId>,
 }
 
 #[derive(Clone, Default)]
+/// scan table row data
 pub struct ScanRow {
+    /// Bluetooth DeviceId
     pub bt_id: Option<DeviceId>,
-    // addr: String,
+    /// Name of Bluetooth Device
     pub name: String,
+    /// Received Signal Strength Indicator
     pub rssi: i16,
 }
 
 #[derive(Eq, PartialEq, Debug, Ord, PartialOrd, Clone, Copy, Hash, Default, EnumIter, Display)]
+/// visible columns of scan table
 pub enum ScanColumns {
     #[default]
-    // #[strum(to_string = "Id")]
-    // Id,
     #[strum(to_string = "Name")]
     Name,
     #[strum(to_string = "RSSI")]

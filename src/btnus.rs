@@ -17,8 +17,11 @@ use tracing::{debug, error, info, trace, warn};
 
 use uuid::Uuid;
 
+/// UUID for NUS BLE Service
 const NUS_SVC_UUID: Uuid = Uuid::from_u128(0x6E400001_B5A3_F393_E0A9_E50E24DCCA9E);
+/// UUID for NUS Rx (BLE writes to device) BLE Characteristic
 const NUS_RX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400002_B5A3_F393_E0A9_E50E24DCCA9E);
+/// UUID for NUS Tx (BLE notifs from device) BLE Characteristic
 const NUS_TX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E24DCCA9E);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +70,7 @@ pub enum ThreadedNusMsg {
 }
 use ThreadedNusMsg::*;
 
+/// async function to handle connection and active use for NUS data transfer
 async fn bt_nus_setup_and_loop(
     adapter: &bluest::Adapter,
     bt_id: &DeviceId,
@@ -178,6 +182,7 @@ async fn bt_nus_setup_and_loop(
     Ok(do_quit)
 }
 
+/// function to spawn thread that manages BLE operations and messaging
 pub fn spawn_btnus_thread(
     cmd: flume::Receiver<ThreadedNusMsg>,
     resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
