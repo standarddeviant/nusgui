@@ -93,12 +93,13 @@ impl NusGui {
     /// This function
     /// 1. Creates some empty/default objects to satisfy fields
     /// 2. Creates 'both sides' of a `flume` channel for sending commands
-    ///   - cmd_tx is stored in NusGui for use by the GUI thread
-    ///   - cmd_rx is given to spawned Bluetooth thread
-    /// 3. Creates an instance of `egui_inbox::UiInbox` that is stored in `NusGui`
-    /// 4. Creates an instance of `egui_inbox::UiInboxSender' that is given to spawned Bluetooth thread
-    /// 5. Spawns Bluetooth thread and saves the (currently unused) thread handle
-    /// 6. Returns a new instance of `NusGui` that is attached to a spawned Bluetooth thread
+    ///   * `cmd_tx: flume::Sender<ThreadedNusMsg>` is stored in NusGui for use by the GUI thread
+    ///   * `cmd_rx: flume::Receiver<ThreadedNusMsg>` is given to spawned BT thread
+    /// 3. Creates 'both sides' of an `egui_inbox` 'channel'
+    ///   * `inbox: egui_inbox::UiInbox<ThreadedNusMsg>` is stored in NusGui for GUI thread to receive messages from BT thread
+    ///   * `sender: egui_inbox::UiInboxSender<ThreadedNusMsg>` is given to BT thread to send messages
+    /// 4. Spawns BT thread and saves the (currently unused) thread handle
+    /// 5. Returns a new instance of `NusGui` that is attached to a spawned BT thread
     pub fn new(ctx: &Context, cc: &CreationContext) -> Self {
         cc.egui_ctx
             .options_mut(|a| a.theme_preference = ThemePreference::System);
