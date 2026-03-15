@@ -1,9 +1,8 @@
 use bluest::DeviceId;
 use egui_selectable_table::{
-    AutoScroll, ColumnOperations, ColumnOrdering, SelectableRow, SelectableTable, SortOrder,
+    ColumnOperations, ColumnOrdering, SelectableRow, SelectableTable, SortOrder,
 };
 
-use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter}; // 0.25
 
 use egui::{Button, Ui};
@@ -12,7 +11,7 @@ use egui::{Button, Ui};
 pub struct ScanConfig {
     // counting_ongoing: bool,
     pub connect_row_id: Option<i64>,
-    pub connect_dev_id: Option<DeviceId>,
+    pub _connect_dev_id: Option<DeviceId>,
 }
 
 #[derive(Clone, Default)]
@@ -69,9 +68,9 @@ impl ColumnOperations<ScanRow, ScanColumns, ScanConfig> for ScanColumns {
         cell_selected: bool,
         table: &mut SelectableTable<ScanRow, ScanColumns, ScanConfig>,
     ) -> egui::Response {
-        let row_id = row.id;
+        let _row_id = row.id;
         let row_data = &row.row_data;
-        let config = table.config.clone();
+        let _config = table.config.clone();
 
         let text = match self {
             // ScanColumns::Id => format!("{row_id}"), //row_data.id.to_string(),

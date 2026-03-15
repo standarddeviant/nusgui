@@ -6,14 +6,13 @@ use std::collections::HashMap;
 use bluest::AdvertisingDevice;
 use bluest::DeviceId;
 use eframe::egui::{Button, TopBottomPanel, Vec2};
-use eframe::epaint::color;
 use eframe::{App, CreationContext, Frame, egui, epaint::Color32};
 use egui_colors::Colorix;
 // use egui_colors::{Colorix; ThemeColor};
 use egui::text::{CCursor, CCursorRange};
 use egui::{Align, CentralPanel, Context, Layout, ThemePreference, Ui};
 use egui_extras::Column;
-use egui_inbox::{UiInbox, UiInboxSender};
+use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
 
 use flume;
@@ -34,7 +33,7 @@ use crate::btnus::ThreadedNusMsg;
 use crate::scan_table::{ScanColumns, ScanConfig, ScanRow};
 
 use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter}; // 0.25
+// 0.25
 //
 use flume::Sender;
 
@@ -50,7 +49,7 @@ struct NusGui {
     bt_state: ThreadedNusMsg,
 
     /// bt thread handle
-    bt_handle: std::thread::JoinHandle<Option<u32>>,
+    _bt_handle: std::thread::JoinHandle<Option<u32>>,
 
     /// vector of AdvertisingDevice objects from scan process
     scan_vec: Vec<AdvertisingDevice>,
@@ -117,7 +116,7 @@ impl NusGui {
         let resp_tx = inbox.sender();
 
         // NOTE: spawn btnus thread with async runtime
-        let bt_handle: std::thread::JoinHandle<Option<u32>> = spawn_btnus_thread(cmd_rx, resp_tx);
+        let _bt_handle: std::thread::JoinHandle<Option<u32>> = spawn_btnus_thread(cmd_rx, resp_tx);
 
         let nus_tx_multi_string: String = "".into();
         let nus_rx_single_string: String = "".into();
@@ -131,7 +130,7 @@ impl NusGui {
             cmd_tx,
             inbox,
             bt_state,
-            bt_handle,
+            _bt_handle,
             scan_vec,
             scan_map,
             // scan_columns,
@@ -278,7 +277,7 @@ impl NusGui {
         });
     }
 
-    fn draw_central_panel(&mut self, ctx: &Context, ui: &mut Ui) {
+    fn draw_central_panel(&mut self, _ctx: &Context, ui: &mut Ui) {
         // make 'actionable copy' of bt_state so called functions can alter self.bt_state
         // let bt_state = self.bt_state.clone();
         match self.bt_state.clone() {
@@ -470,7 +469,6 @@ impl NusGui {
     }
 }
 
-use egui_aesthetix;
 impl App for NusGui {
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         if self.latch_once {

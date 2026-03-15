@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use bluest::{Adapter, AdvertisingDevice, Device, DeviceId};
-use flume::Receiver;
 
 use futures_lite::StreamExt;
 
@@ -16,7 +15,6 @@ use tokio::time::{Duration, timeout};
 use tracing::{debug, error, info, trace, warn};
 // use tracing::{error, info, warn};
 
-use egui_inbox::UiInboxSender;
 use uuid::Uuid;
 
 const NUS_SVC_UUID: Uuid = Uuid::from_u128(0x6E400001_B5A3_F393_E0A9_E50E24DCCA9E);
@@ -56,7 +54,7 @@ async fn bt_nus_setup_and_loop(
 ) -> Result<bool, Box<dyn Error>> {
     let mut do_quit = false;
     // make device connection
-    let mut device = adapter.open_device(&bt_id).await?;
+    let device = adapter.open_device(&bt_id).await?;
     adapter.connect_device(&device).await?;
 
     // use device to obtain service
@@ -174,9 +172,9 @@ pub fn spawn_btnus_thread(
                     break;
                 }
                 // NOTE: state 1a-of-4: idle (not ready)
-                let mut connect_bt_id: Option<DeviceId> = None;
+                let mut connect_bt_id: Option<DeviceId>;
                 let mut scan_map: HashMap<DeviceId, Device> = HashMap::new();
-                let mut option_adapter = None;
+                let mut option_adapter: Option<Adapter>;
                 loop {
                     // TODO: put this in an async function that returns result and use ? operator???
                     option_adapter = Adapter::default().await;
@@ -235,7 +233,7 @@ pub fn spawn_btnus_thread(
                 // if connect_bt_id is None, then let's scan!
                 if connect_bt_id.is_none() {
                     info!("starting scan");
-                    let mut scan = adapter.scan(&[]).await;
+                    let scan = adapter.scan(&[]).await;
                     if scan.is_err() {
                         resp.send(AmNotReady).ok();
                         std::thread::sleep(Duration::from_millis(1000));
@@ -292,7 +290,7 @@ pub fn spawn_btnus_thread(
                             Ok(ok_do_quit) => {
                                 info!("succesful disconnect");
                                 if ok_do_quit {
-                                    do_quit = true;
+                                    // do_quit = true;
                                     // WARN: this *should* break the forever loop
                                     break;
                                 }
