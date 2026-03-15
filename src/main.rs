@@ -514,7 +514,11 @@ pub fn main() -> eframe::Result<()> {
         .with(filter)
         .init();
 
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]), // Set default size here
+        ..Default::default()
+    };
+
     eframe::run_native(
         "NUS GUI",
         options,
