@@ -23,26 +23,47 @@ const NUS_TX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E24DC
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThreadedNusMsg {
-    // Commands
-    // Ready,
-    // StartConnect(Vec<u8>),
+    /// Command to start scanning
     DoScanStart(String), // FIXME: put scan params as a type in this event
+
+    /// Command to stop scanning
     DoScanStop,
+
+    /// Command to connect
     DoConnect(DeviceId),
+
+    /// Command to disconnect
     DoDisconnect,
+
+    /// Command to quit
     DoQuit,
-    //
+
+    /// Scan result data
     DataScanResult(Vec<AdvertisingDevice>),
+
+    /// NUS TX bytes (BLE notif from device)
     DataTx(Vec<u8>),
+
+    /// NUS RX bytes (BLE write to device)
     DataRx(Vec<u8>),
-    //
+
+    /// Not Ready State 
     AmNotReady,
+
+    /// Not Ready State 
     AmReadyIdle(String),
+
+    /// Scanning State
     AmScanning,
+
+    /// Connecting State
     AmConnecting,
+
+    /// Connected State
     AmConnected,
+
+    /// 'Quitted' State
     AmQuitted,
-    // AmDone,
 }
 use ThreadedNusMsg::*;
 
