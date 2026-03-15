@@ -88,10 +88,17 @@ struct NusGui {
 const PEACH32: Color32 = Color32::from_rgb(0xFF, 0xD3, 0xAC);
 
 impl NusGui {
-    // pub fn wait_on_bt_nus_thread(&mut self) {
-    //     std::thread::jo
-    //     //
-    // }
+    /// Create new NusGui instance
+    ///
+    /// This function
+    /// 1. Creates some empty/default objects to satisfy fields
+    /// 2. Creates 'both sides' of a `flume` channel for sending commands
+    ///   - cmd_tx is stored in NusGui for use by the GUI thread
+    ///   - cmd_rx is given to spawned Bluetooth thread
+    /// 3. Creates an instance of `egui_inbox::UiInbox` that is stored in `NusGui`
+    /// 4. Creates an instance of `egui_inbox::UiInboxSender' that is given to spawned Bluetooth thread
+    /// 5. Spawns Bluetooth thread and saves the (currently unused) thread handle
+    /// 6. Returns a new instance of `NusGui` that is attached to a spawned Bluetooth thread
     pub fn new(ctx: &Context, cc: &CreationContext) -> Self {
         cc.egui_ctx
             .options_mut(|a| a.theme_preference = ThemePreference::System);
@@ -147,6 +154,7 @@ impl NusGui {
         }
     }
 
+    /// This function handles up + down arrow key presses to satisfy navigating text input history
     fn process_input_history(&mut self, ui: &mut Ui) {
         ui.input(|i| {
             if i.key_pressed(egui::Key::ArrowUp) {
@@ -181,6 +189,7 @@ impl NusGui {
         });
     }
 
+    // Read and process incoming messages to `egui_inbox::UiInbox<ThreadedNusMsg>`
     fn process_inbox(&mut self, _ctx: &Context, ui: &mut Ui) {
         // loop through all received responses
         for response in self.inbox.read(ui) {
@@ -239,6 +248,7 @@ impl NusGui {
         }
     } // end process_inbox
 
+    /// convenience function to draw top panel of GUI
     fn draw_top_panel(&mut self, _ctx: &Context, ui: &mut Ui) {
         ui.horizontal(|ui| {
             // egui::widgets::global_theme_preference_buttons(ui);
@@ -277,6 +287,7 @@ impl NusGui {
         });
     }
 
+    /// convenience function to draw central panel of GUI
     fn draw_central_panel(&mut self, _ctx: &Context, ui: &mut Ui) {
         // make 'actionable copy' of bt_state so called functions can alter self.bt_state
         // let bt_state = self.bt_state.clone();
@@ -312,6 +323,7 @@ impl NusGui {
         }
     }
 
+    /// convenience function to draw central panel of GUI when idle or scanning
     fn draw_central_panel_idle_scan(&mut self, ui: &mut Ui) {
         ui.label(format!("State: {:?}", self.bt_state));
         ui.label(format!("Found {} devices", self.scan_map.len()));
@@ -390,6 +402,7 @@ impl NusGui {
         });
     } // end draw_central_panel
 
+    /// convenience function to draw central panel of GUI when connected to a NUS capable device
     fn draw_central_panel_connected(&mut self, ui: &mut Ui) {
         // TODO: add multiline text edit via ui.enabled(false) w/ diff. APIs
         //       reason: adding .interactive(false) to multiline TextEdit makes the text
