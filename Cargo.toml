@@ -1,12 +1,12 @@
 [package]
 name = "nusgui"
-version = "0.1.1-alpha.6"
+version = "0.1.1-alpha.7"
 description = "GUI to communicate with BLE NUS devices"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/standarddeviant/nusgui"
 authors = ["Dave Crist"]
-rust-version = "1.83.0" # minimum supported Rust version
+rust-version = "1.85.0" # minimum supported Rust version
 
 [dependencies]
 bluest = "0.6.9"
