@@ -1,6 +1,15 @@
 # `nusgui`
 
-`nusgui` is a rust GUI for communicating with BLE (Bluetooth Low Energy) devices that support the 'NUS' service to achieve serial port behavior.
+`nusgui` is a GUI application for communicating with BLE (Bluetooth Low Energy) devices that support the 'NUS' (Nordic UART Service) service to achieve serial port behavior.
+
+`nusgui` is written in Rust and leverages `egui` for the GUI and `bluest` for the BLE funtionality.
+
+## Note on `async` vs. non-`async`
+Well supported, cross-platform Rust BLE crates require `async` code. 
+`egui` operations are not `async` since that would pause the main thread where the GUI is running.
+To join the `async` BLE operations with the non-`async` GUI operations, we use
+- `flume::unbounded()` channel for GUI -> BT communication
+- `egui_inbox::UiInbox` for GUI <- BT communication
 
 ## Installation
 
