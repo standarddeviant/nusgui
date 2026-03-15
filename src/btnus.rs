@@ -90,26 +90,25 @@ async fn bt_nus_setup_and_loop(
     }
 
     let nus_svc = nus_svc.unwrap();
+    info!("found NUS Service");
 
     // use service to obtain (RX) characteristic
     let nus_rx_chr = nus_svc
         .discover_characteristics_with_uuid(NUS_RX_CHR_UUID)
         .await?;
     let nus_rx_chr = &nus_rx_chr[0];
+    info!("found NUS RX");
 
     // use service to obtain (TX) characteristic
     let nus_tx_chr = nus_svc
         .discover_characteristics_with_uuid(NUS_TX_CHR_UUID)
         .await?;
     let nus_tx_chr = &nus_tx_chr[0];
+    info!("found NUS RX");
 
     // enable notifs on TX characteristic
     let mut nus_tx_notifs = nus_tx_chr.notify().await?;
-
-    info!(
-        "nus_tx_chr.is_notifying() = {:?}",
-        nus_tx_chr.is_notifying().await?
-    );
+    info!("enabled notifs on NUS TX");
 
     info!("nus chars are ready!");
     let _ = resp.send(AmConnected);
@@ -125,7 +124,7 @@ async fn bt_nus_setup_and_loop(
 
         // 1. check input if we should Disconnect -OR- relay bytes to device via nus_rx_chr
         loop {
-            match cmd.recv_timeout(Duration::from_millis(0)) {
+            match cmd.recv_timeout(Duration::from_millis(10)) {
                 Ok(DoQuit) => {
                     do_quit = true;
                     info!("recv DoQuit");
@@ -315,6 +314,7 @@ pub fn spawn_btnus_thread(
                 // NOTE: state 3-of-4: connecting
                 match connect_bt_id {
                     Some(bt_id) => {
+                        let _ = resp.send(AmConnecting);
                         // NOTE: state 4-of-4: connected (handled inside async fn)
                         match bt_nus_setup_and_loop(&adapter, &bt_id, &cmd, &resp).await {
                             Ok(ok_do_quit) => {

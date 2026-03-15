@@ -369,6 +369,7 @@ impl NusGui {
                     match row_data.bt_id {
                         Some(bt_id) => {
                             self.nus_tx_multi_string.clear();
+                            let _ = self.cmd_tx.send(DoScanStop);
                             let _ = self.cmd_tx.send(DoConnect(bt_id));
                             self.bt_state = AmConnecting;
                         }
