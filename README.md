@@ -11,6 +11,11 @@ To join the `async` BLE operations with the non-`async` GUI operations, we use
 - `flume::unbounded()` channel for GUI -> BT communication
 - `egui_inbox::UiInbox` for GUI <- BT communication
 
+This 'threaded communication' requires the definition of 'threaded messages'. For simplicity all messages in either direction are of the type, `ThreadedNusMsg` which is a rust enum that can communicate 
+- state (`Am...`) or 
+- commands (`Do...`) or 
+- data (`Data...`) or 
+
 ## Installation
 
 ```bash
