@@ -2,6 +2,7 @@
 
 use core::f32;
 use std::collections::HashMap;
+use std::thread::JoinHandle;
 
 use bluest::AdvertisingDevice;
 use bluest::DeviceId;
@@ -15,6 +16,8 @@ use egui::{Align, CentralPanel, Context, Layout, ThemePreference, Ui};
 use egui_extras::Column;
 use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
+
+// use serde;
 
 mod btnus;
 mod scan_table;
@@ -37,26 +40,35 @@ use strum::IntoEnumIterator;
 use flume::Sender;
 
 /// core struct representing the state of nusgui
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)] // Use Default if fields are skipped
 struct NusGui {
     /// (flume) Sender for gui->bt send comms
+    #[serde(skip)]
     cmd_tx: Sender<ThreadedNusMsg>,
 
     /// (egui_inbox) inbox (like Receiver) for gui<-bt recv comms
+    #[serde(skip)]
     inbox: UiInbox<ThreadedNusMsg>,
 
     /// message passed state of gui+bt threads
+    #[serde(skip)]
     bt_state: ThreadedNusMsg,
 
     /// bt thread handle
-    _bt_handle: std::thread::JoinHandle<Option<u32>>,
+    // #[serde(skip)]
+    // _bt_handle: std::thread::JoinHandle<Option<u32>>,
 
     /// vector of AdvertisingDevice objects from scan process
+    #[serde(skip)]
     scan_vec: Vec<AdvertisingDevice>,
 
     /// hashmap of AdvertisingDevice objects from scan process
+    #[serde(skip)]
     scan_map: HashMap<DeviceId, AdvertisingDevice>,
 
     /// scan results table
+    #[serde(skip)]
     table: SelectableTable<ScanRow, ScanColumns, ScanConfig>,
 
     /// actual nus string data stored as single multiline string
@@ -87,6 +99,7 @@ struct NusGui {
     latch_once: bool,
 
     /// color theme helper object
+    #[serde(skip)]
     colorix: Colorix,
 }
 
@@ -110,13 +123,11 @@ impl NusGui {
             .options_mut(|a| a.theme_preference = ThemePreference::System);
 
         // NOTE: async/thread comms
-        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
         let bt_state: ThreadedNusMsg = AmNotReady;
         let scan_vec: Vec<AdvertisingDevice> = vec![];
         let scan_map: HashMap<DeviceId, AdvertisingDevice> = HashMap::default();
 
         let scan_columns = ScanColumns::iter().collect();
-
         // Auto reload after each 10k table row add or modification
         let table = SelectableTable::new(scan_columns)
             .auto_reload(10_000)
@@ -126,6 +137,7 @@ impl NusGui {
             .no_ctrl_a_capture();
 
         let (cmd_tx, cmd_rx) = flume::unbounded();
+        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
         let resp_tx = inbox.sender();
 
         // NOTE: spawn btnus thread with async runtime
@@ -143,7 +155,7 @@ impl NusGui {
             cmd_tx,
             inbox,
             bt_state,
-            _bt_handle,
+            // _bt_handle,
             scan_vec,
             scan_map,
             // scan_columns,
@@ -527,7 +539,48 @@ impl NusGui {
     }
 }
 
+impl Default for NusGui {
+    fn default() -> Self {
+        let (cmd_tx, cmd_rx) = flume::unbounded();
+        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
+        let resp_tx = inbox.sender();
+
+        let scan_columns = ScanColumns::iter().collect();
+        // Auto reload after each 10k table row add or modification
+        let table = SelectableTable::new(scan_columns)
+            .auto_reload(10_000)
+            .auto_scroll()
+            .horizontal_scroll()
+            .select_full_row()
+            .no_ctrl_a_capture();
+
+        Self {
+            cmd_tx,
+            inbox,
+            bt_state: ThreadedNusMsg::AmNotReady,
+            // _bt_handle: JoinHandle::
+            scan_vec: Default::default(),
+            scan_map: Default::default(),
+            table,
+            nus_tx_multi_string: Default::default(),
+            nus_rx_single_string: Default::default(),
+            nus_rx_history: Default::default(),
+            nus_rx_history_index: Default::default(),
+            nus_rx_snap_cursor: Default::default(),
+            scan_filt_svc_present: Default::default(),
+            scan_filt_name: Default::default(),
+            do_quit: Default::default(),
+            latch_once: Default::default(),
+            colorix: Default::default(),
+        }
+    }
+}
+
 impl App for NusGui {
+    // Saved state is loaded here at startup
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
+    }
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         if self.latch_once {
             self.latch_once = false;
