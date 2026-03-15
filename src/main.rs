@@ -485,7 +485,7 @@ pub fn main() -> eframe::Result<()> {
     let filter = filter::Targets::new()
         // Enable the `INFO` level for anything in `my_crate`
         .with_default(LevelFilter::INFO)
-        .with_target("hope", LevelFilter::INFO)
+        .with_target("nusgui", LevelFilter::INFO)
         .with_target("bluest", LevelFilter::WARN);
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
