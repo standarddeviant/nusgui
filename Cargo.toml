@@ -1,6 +1,6 @@
 [package]
 name = "nusgui"
-version = "0.1.1-alpha.7"
+version = "0.1.1"
 description = "GUI to communicate with BLE NUS devices"
 edition = "2024"
 license = "MIT"
