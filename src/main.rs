@@ -2,7 +2,6 @@
 
 use core::f32;
 use std::collections::HashMap;
-use std::thread::JoinHandle;
 
 use bluest::AdvertisingDevice;
 use bluest::DeviceId;
@@ -122,57 +121,28 @@ impl NusGui {
         cc.egui_ctx
             .options_mut(|a| a.theme_preference = ThemePreference::System);
 
-        // NOTE: async/thread comms
-        let bt_state: ThreadedNusMsg = AmNotReady;
-        let scan_vec: Vec<AdvertisingDevice> = vec![];
-        let scan_map: HashMap<DeviceId, AdvertisingDevice> = HashMap::default();
+        // Otherwise, return default
+        let mut out: NusGui = Default::default();
+        out.colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
 
-        let scan_columns = ScanColumns::iter().collect();
-        // Auto reload after each 10k table row add or modification
-        let table = SelectableTable::new(scan_columns)
-            .auto_reload(10_000)
-            .auto_scroll()
-            .horizontal_scroll()
-            .select_full_row()
-            .no_ctrl_a_capture();
-
-        let (cmd_tx, cmd_rx) = flume::unbounded();
-        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
-        let resp_tx = inbox.sender();
-
-        // NOTE: spawn btnus thread with async runtime
-        let _bt_handle: std::thread::JoinHandle<Option<u32>> = spawn_btnus_thread(cmd_rx, resp_tx);
-
-        let nus_tx_multi_string: String = "".into();
-        let nus_rx_single_string: String = "".into();
-        let nus_rx_history = vec![];
-        let nus_rx_history_index = None;
-        let nus_rx_snap_cursor = false;
-
-        let colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
-
-        Self {
-            cmd_tx,
-            inbox,
-            bt_state,
-            // _bt_handle,
-            scan_vec,
-            scan_map,
-            // scan_columns,
-            table,
-            nus_tx_multi_string,
-            nus_rx_single_string,
-            nus_rx_history,
-            nus_rx_history_index,
-            nus_rx_snap_cursor,
-            //
-            scan_filt_svc_present: false,
-            scan_filt_name: "".into(),
-            //
-            do_quit: false,
-            latch_once: true,
-            colorix,
+        // load important fields manually for now
+        if let Some(some_storage) = cc.storage {
+            if let Some(some_scan_filt_name) = some_storage.get_string("scan_filt_name") {
+                out.scan_filt_name = some_scan_filt_name
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .replace("\\", "");
+            }
         }
+
+        // if let Some(storage) = cc.storage {
+        //     if let Some(saved_state) = eframe::get_value(storage, eframe::APP_KEY) {
+        //         // let stored =
+        //         // TODO: how to 'overlay' fields from 'stored' on-top-of 'out'
+        //     }
+        // }
+        //
+        out
     }
 
     /// This function handles up + down arrow key presses to satisfy navigating text input history
@@ -351,7 +321,7 @@ impl NusGui {
         ui.separator();
         ui.label(RichText::new("Scan Filters").heading());
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.scan_filt_svc_present, "Advertise NUS Service");
+            ui.checkbox(&mut self.scan_filt_svc_present, "NUS Service");
             ui.label("Name: ");
             ui.text_edit_singleline(&mut self.scan_filt_name);
         });
@@ -541,9 +511,10 @@ impl NusGui {
 
 impl Default for NusGui {
     fn default() -> Self {
-        let (cmd_tx, cmd_rx) = flume::unbounded();
-        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
-        let resp_tx = inbox.sender();
+        // NOTE: async/thread comms
+        let bt_state: ThreadedNusMsg = AmNotReady;
+        let scan_vec: Vec<AdvertisingDevice> = vec![];
+        let scan_map: HashMap<DeviceId, AdvertisingDevice> = HashMap::default();
 
         let scan_columns = ScanColumns::iter().collect();
         // Auto reload after each 10k table row add or modification
@@ -554,24 +525,43 @@ impl Default for NusGui {
             .select_full_row()
             .no_ctrl_a_capture();
 
+        let (cmd_tx, cmd_rx) = flume::unbounded();
+        let inbox: UiInbox<ThreadedNusMsg> = UiInbox::new();
+        let resp_tx = inbox.sender();
+
+        // NOTE: spawn btnus thread with async runtime
+        let _bt_handle: std::thread::JoinHandle<Option<u32>> = spawn_btnus_thread(cmd_rx, resp_tx);
+
+        let nus_tx_multi_string: String = "".into();
+        let nus_rx_single_string: String = "".into();
+        let nus_rx_history = vec![];
+        let nus_rx_history_index = None;
+        let nus_rx_snap_cursor = false;
+
+        // let colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
+        let colorix = Colorix::default();
+
         Self {
             cmd_tx,
             inbox,
-            bt_state: ThreadedNusMsg::AmNotReady,
-            // _bt_handle: JoinHandle::
-            scan_vec: Default::default(),
-            scan_map: Default::default(),
+            bt_state,
+            // _bt_handle,
+            scan_vec,
+            scan_map,
+            // scan_columns,
             table,
-            nus_tx_multi_string: Default::default(),
-            nus_rx_single_string: Default::default(),
-            nus_rx_history: Default::default(),
-            nus_rx_history_index: Default::default(),
-            nus_rx_snap_cursor: Default::default(),
-            scan_filt_svc_present: Default::default(),
-            scan_filt_name: Default::default(),
-            do_quit: Default::default(),
-            latch_once: Default::default(),
-            colorix: Default::default(),
+            nus_tx_multi_string,
+            nus_rx_single_string,
+            nus_rx_history,
+            nus_rx_history_index,
+            nus_rx_snap_cursor,
+            //
+            scan_filt_svc_present: false,
+            scan_filt_name: "".into(),
+            //
+            do_quit: false,
+            latch_once: true,
+            colorix,
         }
     }
 }
@@ -580,6 +570,7 @@ impl App for NusGui {
     // Saved state is loaded here at startup
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
+        eframe::set_value(storage, "scan_filt_name", &self.scan_filt_name);
     }
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         if self.latch_once {
