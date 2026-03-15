@@ -454,11 +454,6 @@ impl App for NusGui {
             // ??
         }
 
-        if self.do_quit {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            return;
-        }
-
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.draw_top_panel(ctx, ui);
         });
@@ -473,6 +468,11 @@ impl App for NusGui {
 
             // NOTE: update data from received messages in inbox
             self.process_inbox(ctx, ui);
+
+            if self.do_quit {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                return;
+            }
 
             // draw central panel
             self.draw_central_panel(ctx, ui);
