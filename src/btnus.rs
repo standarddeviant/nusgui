@@ -347,3 +347,194 @@ pub fn spawn_btnus_thread(
         None // return None to satisfy JoinHandle<Option<u32>>
     }) // returning spawned thread handle;
 } // end fn spawn_btnus_thread
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    // --- UUID constant tests ---
+
+    #[test]
+    fn nus_svc_uuid_has_correct_value() {
+        let expected = Uuid::from_u128(0x6E400001_B5A3_F393_E0A9_E50E24DCCA9E);
+        assert_eq!(NUS_SVC_UUID, expected);
+    }
+
+    #[test]
+    fn nus_rx_chr_uuid_has_correct_value() {
+        let expected = Uuid::from_u128(0x6E400002_B5A3_F393_E0A9_E50E24DCCA9E);
+        assert_eq!(NUS_RX_CHR_UUID, expected);
+    }
+
+    #[test]
+    fn nus_tx_chr_uuid_has_correct_value() {
+        let expected = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E24DCCA9E);
+        assert_eq!(NUS_TX_CHR_UUID, expected);
+    }
+
+    #[test]
+    fn nus_uuids_are_all_distinct() {
+        assert_ne!(NUS_SVC_UUID, NUS_RX_CHR_UUID);
+        assert_ne!(NUS_SVC_UUID, NUS_TX_CHR_UUID);
+        assert_ne!(NUS_RX_CHR_UUID, NUS_TX_CHR_UUID);
+    }
+
+    #[test]
+    fn nus_svc_uuid_matches_nordic_nus_service_spec() {
+        // The NUS service UUID per Nordic spec is 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
+        let uuid_str = NUS_SVC_UUID.to_string().to_lowercase();
+        assert_eq!(uuid_str, "6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+    }
+
+    #[test]
+    fn nus_rx_chr_uuid_matches_nordic_nus_rx_spec() {
+        // The NUS RX characteristic UUID per Nordic spec is 6E400002-B5A3-F393-E0A9-E50E24DCCA9E
+        let uuid_str = NUS_RX_CHR_UUID.to_string().to_lowercase();
+        assert_eq!(uuid_str, "6e400002-b5a3-f393-e0a9-e50e24dcca9e");
+    }
+
+    #[test]
+    fn nus_tx_chr_uuid_matches_nordic_nus_tx_spec() {
+        // The NUS TX characteristic UUID per Nordic spec is 6E400003-B5A3-F393-E0A9-E50E24DCCA9E
+        let uuid_str = NUS_TX_CHR_UUID.to_string().to_lowercase();
+        assert_eq!(uuid_str, "6e400003-b5a3-f393-e0a9-e50e24dcca9e");
+    }
+
+    // --- ThreadedNusMsg trait derivation tests ---
+
+    #[test]
+    fn threaded_nus_msg_clone_works_for_simple_variants() {
+        let msg = ThreadedNusMsg::AmNotReady;
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_clone_works_for_string_variant() {
+        let msg = ThreadedNusMsg::AmReadyIdle("adapter_desc".to_string());
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_clone_works_for_do_scan_start() {
+        let msg = ThreadedNusMsg::DoScanStart("options".to_string());
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_clone_works_for_data_tx() {
+        let msg = ThreadedNusMsg::DataTx(vec![0x01, 0x02, 0x03]);
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_clone_works_for_data_rx() {
+        let msg = ThreadedNusMsg::DataRx(vec![0xAA, 0xBB]);
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_partial_eq_distinguishes_variants() {
+        assert_ne!(ThreadedNusMsg::AmNotReady, ThreadedNusMsg::AmConnected);
+        assert_ne!(ThreadedNusMsg::AmScanning, ThreadedNusMsg::AmConnecting);
+        assert_ne!(ThreadedNusMsg::DoScanStop, ThreadedNusMsg::DoDisconnect);
+        assert_ne!(ThreadedNusMsg::DoQuit, ThreadedNusMsg::AmQuitted);
+    }
+
+    #[test]
+    fn threaded_nus_msg_partial_eq_matches_identical_variants() {
+        assert_eq!(ThreadedNusMsg::AmNotReady, ThreadedNusMsg::AmNotReady);
+        assert_eq!(ThreadedNusMsg::AmConnected, ThreadedNusMsg::AmConnected);
+        assert_eq!(ThreadedNusMsg::AmScanning, ThreadedNusMsg::AmScanning);
+        assert_eq!(ThreadedNusMsg::AmConnecting, ThreadedNusMsg::AmConnecting);
+        assert_eq!(ThreadedNusMsg::AmQuitted, ThreadedNusMsg::AmQuitted);
+        assert_eq!(ThreadedNusMsg::DoScanStop, ThreadedNusMsg::DoScanStop);
+        assert_eq!(ThreadedNusMsg::DoDisconnect, ThreadedNusMsg::DoDisconnect);
+        assert_eq!(ThreadedNusMsg::DoQuit, ThreadedNusMsg::DoQuit);
+    }
+
+    #[test]
+    fn threaded_nus_msg_partial_eq_compares_string_content() {
+        let a = ThreadedNusMsg::AmReadyIdle("desc_a".to_string());
+        let b = ThreadedNusMsg::AmReadyIdle("desc_b".to_string());
+        let a_again = ThreadedNusMsg::AmReadyIdle("desc_a".to_string());
+        assert_ne!(a, b);
+        assert_eq!(a, a_again);
+    }
+
+    #[test]
+    fn threaded_nus_msg_partial_eq_compares_byte_content() {
+        let a = ThreadedNusMsg::DataTx(vec![1, 2, 3]);
+        let b = ThreadedNusMsg::DataTx(vec![1, 2, 4]);
+        let a_again = ThreadedNusMsg::DataTx(vec![1, 2, 3]);
+        assert_ne!(a, b);
+        assert_eq!(a, a_again);
+    }
+
+    #[test]
+    fn threaded_nus_msg_debug_includes_variant_name() {
+        let msg = ThreadedNusMsg::AmNotReady;
+        let debug_str = format!("{:?}", msg);
+        assert!(debug_str.contains("AmNotReady"));
+    }
+
+    #[test]
+    fn threaded_nus_msg_do_scan_start_empty_string() {
+        let msg = ThreadedNusMsg::DoScanStart(String::new());
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn threaded_nus_msg_data_tx_empty_bytes() {
+        let msg = ThreadedNusMsg::DataTx(vec![]);
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+        assert_eq!(cloned, ThreadedNusMsg::DataTx(vec![]));
+    }
+
+    #[test]
+    fn threaded_nus_msg_data_rx_empty_bytes() {
+        let msg = ThreadedNusMsg::DataRx(vec![]);
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    // --- Channel communication tests (no hardware needed) ---
+
+    #[test]
+    fn flume_channel_can_send_and_recv_threaded_nus_msg() {
+        let (tx, rx) = flume::unbounded::<ThreadedNusMsg>();
+        tx.send(ThreadedNusMsg::DoScanStop).unwrap();
+        let received = rx.recv().unwrap();
+        assert_eq!(received, ThreadedNusMsg::DoScanStop);
+    }
+
+    #[test]
+    fn flume_channel_can_send_multiple_messages() {
+        let (tx, rx) = flume::unbounded::<ThreadedNusMsg>();
+        tx.send(ThreadedNusMsg::AmNotReady).unwrap();
+        tx.send(ThreadedNusMsg::AmScanning).unwrap();
+        tx.send(ThreadedNusMsg::AmConnected).unwrap();
+
+        assert_eq!(rx.recv().unwrap(), ThreadedNusMsg::AmNotReady);
+        assert_eq!(rx.recv().unwrap(), ThreadedNusMsg::AmScanning);
+        assert_eq!(rx.recv().unwrap(), ThreadedNusMsg::AmConnected);
+    }
+
+    #[test]
+    fn flume_channel_send_data_rx_bytes() {
+        let (tx, rx) = flume::unbounded::<ThreadedNusMsg>();
+        let payload = b"hello\n".to_vec();
+        tx.send(ThreadedNusMsg::DataRx(payload.clone())).unwrap();
+        match rx.recv().unwrap() {
+            ThreadedNusMsg::DataRx(bytes) => assert_eq!(bytes, payload),
+            other => panic!("Unexpected message: {:?}", other),
+        }
+    }
+}

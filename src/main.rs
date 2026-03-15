@@ -482,32 +482,50 @@ impl NusGui {
     }
 
     fn scan_filt_match(&self, adv_dev: &AdvertisingDevice) -> bool {
-        // check 0: if no filter, then return true
-        if !self.scan_filt_svc_present && self.scan_filt_name.trim().is_empty() {
-            return true;
-        }
+        scan_filt_check(
+            self.scan_filt_svc_present,
+            &self.scan_filt_name,
+            &adv_dev.adv_data.services,
+            adv_dev.adv_data.local_name.as_deref(),
+        )
+    }
+}
 
-        // check 1: svc-present bool is satisfied
-        if self.scan_filt_svc_present && !adv_dev.adv_data.services.contains(&btnus::NUS_SVC_UUID) {
-            return false;
-        }
+/// Pure filter logic extracted for testability.
+///
+/// Returns `true` if the device represented by the given advertisement data
+/// passes all active scan filters.
+fn scan_filt_check(
+    filt_svc_present: bool,
+    filt_name: &str,
+    adv_services: &[uuid::Uuid],
+    adv_local_name: Option<&str>,
+) -> bool {
+    // check 0: if no filter is active, every device passes
+    if !filt_svc_present && filt_name.trim().is_empty() {
+        return true;
+    }
 
-        // check 2: scan_filt_name is satisifed
-        if !self.scan_filt_name.is_empty() {
-            match adv_dev.adv_data.local_name.clone() {
-                Some(adv_dev_name) => {
-                    if !adv_dev_name.contains(&self.scan_filt_name) {
-                        return false;
-                    }
-                }
-                None => {
+    // check 1: NUS service UUID must be in the advertised service list
+    if filt_svc_present && !adv_services.contains(&btnus::NUS_SVC_UUID) {
+        return false;
+    }
+
+    // check 2: advertised name must contain the filter string
+    if !filt_name.is_empty() {
+        match adv_local_name {
+            Some(adv_dev_name) => {
+                if !adv_dev_name.contains(filt_name) {
                     return false;
                 }
             }
+            None => {
+                return false;
+            }
         }
-
-        return true;
     }
+
+    true
 }
 
 impl Default for NusGui {
@@ -639,5 +657,194 @@ fn scan_obj_to_scan_row(scan_obj: &AdvertisingDevice) -> ScanRow {
         bt_id: Some(scan_obj.device.id()),
         name: scan_obj.device.name().unwrap_or("n/a".into()),
         rssi: scan_obj.rssi.unwrap_or(-200_i16),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use btnus::NUS_SVC_UUID;
+    use uuid::Uuid;
+
+    // Helper: a UUID that is NOT the NUS service UUID
+    fn other_uuid() -> Uuid {
+        Uuid::from_u128(0x12345678_1234_1234_1234_123456789ABC)
+    }
+
+    // --- scan_filt_check: no filters active ---
+
+    #[test]
+    fn no_filters_matches_device_with_no_services_and_no_name() {
+        assert!(scan_filt_check(false, "", &[], None));
+    }
+
+    #[test]
+    fn no_filters_matches_device_with_nus_service() {
+        assert!(scan_filt_check(false, "", &[NUS_SVC_UUID], Some("MyDevice")));
+    }
+
+    #[test]
+    fn no_filters_matches_device_with_other_service() {
+        assert!(scan_filt_check(false, "", &[other_uuid()], None));
+    }
+
+    #[test]
+    fn whitespace_only_name_filter_treated_as_no_filter() {
+        // filt_name that is only whitespace → trim().is_empty() is true → no filter
+        assert!(scan_filt_check(false, "   ", &[], None));
+        assert!(scan_filt_check(false, "\t\n", &[], None));
+    }
+
+    // --- scan_filt_check: NUS service filter only ---
+
+    #[test]
+    fn svc_filter_accepts_device_advertising_nus_service() {
+        assert!(scan_filt_check(true, "", &[NUS_SVC_UUID], None));
+    }
+
+    #[test]
+    fn svc_filter_rejects_device_with_no_services() {
+        assert!(!scan_filt_check(true, "", &[], None));
+    }
+
+    #[test]
+    fn svc_filter_rejects_device_with_only_other_services() {
+        assert!(!scan_filt_check(true, "", &[other_uuid()], None));
+    }
+
+    #[test]
+    fn svc_filter_accepts_device_with_nus_service_among_others() {
+        assert!(scan_filt_check(
+            true,
+            "",
+            &[other_uuid(), NUS_SVC_UUID],
+            None
+        ));
+    }
+
+    // --- scan_filt_check: name filter only ---
+
+    #[test]
+    fn name_filter_accepts_exact_match() {
+        assert!(scan_filt_check(false, "NordicDevice", &[], Some("NordicDevice")));
+    }
+
+    #[test]
+    fn name_filter_accepts_substring_match() {
+        assert!(scan_filt_check(false, "Nordic", &[], Some("NordicDevice")));
+    }
+
+    #[test]
+    fn name_filter_accepts_suffix_match() {
+        assert!(scan_filt_check(false, "Device", &[], Some("NordicDevice")));
+    }
+
+    #[test]
+    fn name_filter_rejects_non_matching_name() {
+        assert!(!scan_filt_check(false, "Nordic", &[], Some("AcmeDevice")));
+    }
+
+    #[test]
+    fn name_filter_rejects_device_with_no_advertised_name() {
+        assert!(!scan_filt_check(false, "Nordic", &[], None));
+    }
+
+    #[test]
+    fn name_filter_is_case_sensitive() {
+        // "nordic" should NOT match "NordicDevice" because filter is case-sensitive
+        assert!(!scan_filt_check(false, "nordic", &[], Some("NordicDevice")));
+    }
+
+    #[test]
+    fn name_filter_accepts_empty_advertised_name_when_filter_is_empty() {
+        // An empty filter means no name filter is active → device passes
+        assert!(scan_filt_check(false, "", &[], Some("")));
+    }
+
+    // --- scan_filt_check: both filters active ---
+
+    #[test]
+    fn both_filters_accepts_device_meeting_both_criteria() {
+        assert!(scan_filt_check(
+            true,
+            "Nordic",
+            &[NUS_SVC_UUID],
+            Some("NordicShell")
+        ));
+    }
+
+    #[test]
+    fn both_filters_rejects_device_missing_nus_service_but_matching_name() {
+        assert!(!scan_filt_check(
+            true,
+            "Nordic",
+            &[other_uuid()],
+            Some("NordicShell")
+        ));
+    }
+
+    #[test]
+    fn both_filters_rejects_device_with_nus_service_but_wrong_name() {
+        assert!(!scan_filt_check(
+            true,
+            "Nordic",
+            &[NUS_SVC_UUID],
+            Some("AcmeDevice")
+        ));
+    }
+
+    #[test]
+    fn both_filters_rejects_device_with_nus_service_but_no_name() {
+        assert!(!scan_filt_check(true, "Nordic", &[NUS_SVC_UUID], None));
+    }
+
+    #[test]
+    fn both_filters_rejects_device_with_no_services_and_wrong_name() {
+        assert!(!scan_filt_check(true, "Nordic", &[], Some("AcmeDevice")));
+    }
+
+    // --- scan_filt_check: boundary / regression cases ---
+
+    #[test]
+    fn name_filter_empty_string_with_svc_filter_active_accepts_nus_device() {
+        // name filter is empty (no-op) + svc filter active → only check service
+        assert!(scan_filt_check(true, "", &[NUS_SVC_UUID], None));
+    }
+
+    #[test]
+    fn name_filter_matches_full_name_in_multi_service_list() {
+        assert!(scan_filt_check(
+            false,
+            "Shell",
+            &[other_uuid(), NUS_SVC_UUID],
+            Some("BluetoothShellDevice")
+        ));
+    }
+
+    #[test]
+    fn svc_filter_on_but_name_filter_empty_rejects_device_without_nus() {
+        assert!(!scan_filt_check(true, "", &[], Some("NordicDevice")));
+    }
+
+    #[test]
+    fn name_filter_nonempty_but_svc_filter_off_accepts_device_with_matching_name_and_no_services()
+    {
+        // name matches, no services required since svc filter is off
+        assert!(scan_filt_check(false, "XIAO", &[], Some("XIAO_BLE")));
+    }
+
+    #[test]
+    fn name_filter_exact_single_char_match() {
+        assert!(scan_filt_check(false, "X", &[], Some("XIAO")));
+    }
+
+    #[test]
+    fn name_filter_longer_than_advertised_name_rejects() {
+        assert!(!scan_filt_check(
+            false,
+            "VeryLongFilterString",
+            &[],
+            Some("Short")
+        ));
     }
 }
