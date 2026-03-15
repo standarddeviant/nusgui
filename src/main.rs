@@ -190,7 +190,7 @@ impl NusGui {
         });
     }
 
-    // Read and process incoming messages to `egui_inbox::UiInbox<ThreadedNusMsg>`
+    /// Read and process incoming messages to `egui_inbox::UiInbox<ThreadedNusMsg>`
     fn process_inbox(&mut self, _ctx: &Context, ui: &mut Ui) {
         // loop through all received responses
         for response in self.inbox.read(ui) {
