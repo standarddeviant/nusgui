@@ -40,6 +40,7 @@ The critical UI elements are:
 - [ ] Logging program events to file
 - [ ] Logging NUS payloads to file with optional timestamps
 - [ ] Scan result filtering
+- [ ] Support ANSI escape sequences for color support; leverage `egui_sgr` (RichText)
 
 ## Contributing
 
