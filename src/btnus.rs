@@ -84,7 +84,12 @@ async fn bt_nus_setup_and_loop(
 
     // use device to obtain service
     let nus_svc = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
-    let nus_svc = &nus_svc[0];
+    let nus_svc = nus_svc.get(0);
+    if nus_svc.is_none() {
+        return Ok(false);
+    }
+
+    let nus_svc = nus_svc.unwrap();
 
     // use service to obtain (RX) characteristic
     let nus_rx_chr = nus_svc
