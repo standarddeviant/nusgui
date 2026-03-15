@@ -6,7 +6,7 @@ edition = "2024"
 license = "MIT"
 repository = "https://github.com/standarddeviant/nusgui"
 authors = ["Dave Crist"]
-rust-version = "1.85.0" # minimum supported Rust version
+rust-version = "1.88.0" # minimum supported Rust version
 
 [dependencies]
 bluest = "0.6.9"
