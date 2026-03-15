@@ -3,6 +3,13 @@ name = "nusgui"
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/standarddeviant/nusgui"
+authors = ["Dave Crist"]
+
+[package.metadata.wix]
+upgrade-guid = "5670DFB5-A552-493C-8FF1-7C562B1E1C1D"
+path-guid = "0752E92E-FFA6-42FB-A7AC-054FEC2B4ABA"
+license = false
+eula = false
 
 [dependencies]
 bluest = "0.6.9"
