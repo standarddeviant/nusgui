@@ -265,7 +265,7 @@ impl NusGui {
                     egui::RichText::new("QUIT").color(Color32::WHITE), // Set the text color to white
                 )
                 // Use the fill method to set the button's background color to red
-                .fill(Color32::RED); //
+                .fill(Color32::DARK_RED); //
                 //
                 if ui.add(quit_button).clicked() {
                     let _ = self.cmd_tx.send(DoQuit);
