@@ -4,6 +4,8 @@
 
 `nusgui` is written in Rust and leverages `egui` for the GUI and `bluest` for the BLE funtionality.
 
+If you don't already have a device that implements the NUS BLE service, the *Seeed Studio XIAO nRF54L15* is an inexpensive device that can be programmed with the `shell_bt_nus` example project from NCS (nRF Connect SDK).
+
 ## Note on `async` vs. non-`async`
 Well supported, cross-platform Rust BLE crates require `async` code. 
 `egui` operations are not `async` since that would pause the main thread where the GUI is running.
