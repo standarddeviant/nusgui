@@ -18,11 +18,11 @@ use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 /// UUID for NUS BLE Service
-const NUS_SVC_UUID: Uuid = Uuid::from_u128(0x6E400001_B5A3_F393_E0A9_E50E24DCCA9E);
+pub const NUS_SVC_UUID: Uuid = Uuid::from_u128(0x6E400001_B5A3_F393_E0A9_E50E24DCCA9E);
 /// UUID for NUS Rx (BLE writes to device) BLE Characteristic
-const NUS_RX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400002_B5A3_F393_E0A9_E50E24DCCA9E);
+pub const NUS_RX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400002_B5A3_F393_E0A9_E50E24DCCA9E);
 /// UUID for NUS Tx (BLE notifs from device) BLE Characteristic
-const NUS_TX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E24DCCA9E);
+pub const NUS_TX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E24DCCA9E);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThreadedNusMsg {
@@ -240,7 +240,6 @@ pub fn spawn_btnus_thread(
                             connect_bt_id = Some(bt_id);
                             break;
                         }
-                        // TODO: handle connect device
                         Ok(unh) => {
                             warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
                         }

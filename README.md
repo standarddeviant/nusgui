@@ -51,11 +51,11 @@ The critical UI elements are:
     - Disconnect Button
 
 ## Desired Features
-- [ ] Auto save/load program state to file
+- [x] Auto save/load program state to file
+- [x] Scan result filtering
 - [ ] Input history that filters based on current, unsent text in input field
 - [ ] Logging program events to file
 - [ ] Logging NUS payloads to file with optional timestamps
-- [ ] Scan result filtering
 - [ ] Support ANSI escape sequences for color support; leverage `egui_sgr` (RichText)
 
 ## Contributing

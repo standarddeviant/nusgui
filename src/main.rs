@@ -7,6 +7,7 @@ use bluest::AdvertisingDevice;
 use bluest::DeviceId;
 use eframe::egui::{Button, TopBottomPanel, Vec2};
 use eframe::{App, CreationContext, Frame, egui, epaint::Color32};
+use egui::RichText;
 use egui_colors::Colorix;
 // use egui_colors::{Colorix; ThemeColor};
 use egui::text::{CCursor, CCursorRange};
@@ -72,6 +73,12 @@ struct NusGui {
 
     /// temporary state variable to 'snap the cursor' when updating input field from history
     nus_rx_snap_cursor: bool,
+
+    /// Only show devices advertising NUS service in scan table
+    scan_filt_svc_present: bool,
+
+    /// Only show devices with this string in the advertised name
+    scan_filt_name: String,
 
     /// boolean latch to quit the application
     do_quit: bool,
@@ -147,6 +154,9 @@ impl NusGui {
             nus_rx_history_index,
             nus_rx_snap_cursor,
             //
+            scan_filt_svc_present: false,
+            scan_filt_name: "".into(),
+            //
             do_quit: false,
             latch_once: true,
             colorix,
@@ -217,7 +227,7 @@ impl NusGui {
                     for adv_dev in recvd_scans {
                         let id = adv_dev.device.id();
                         let unique = !self.scan_map.contains_key(&id);
-                        if unique {
+                        if unique && self.scan_filt_match(&adv_dev) {
                             self.scan_map.insert(id, adv_dev.clone());
                             self.scan_vec.push(adv_dev);
                             for scan_obj in &self.scan_vec {
@@ -325,6 +335,15 @@ impl NusGui {
     fn draw_central_panel_idle_scan(&mut self, ui: &mut Ui) {
         ui.label(format!("State: {:?}", self.bt_state));
         ui.label(format!("Found {} devices", self.scan_map.len()));
+
+        ui.separator();
+        ui.label(RichText::new("Scan Filters").heading());
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.scan_filt_svc_present, "Advertise NUS Service");
+            ui.label("Name: ");
+            ui.text_edit_singleline(&mut self.scan_filt_name);
+        });
+        ui.separator();
 
         // scan start/stop
         ui.horizontal(|ui| {
@@ -477,6 +496,34 @@ impl NusGui {
                 self.process_input_history(ui);
             });
         });
+    }
+
+    fn scan_filt_match(&self, adv_dev: &AdvertisingDevice) -> bool {
+        // check 0: if no filter, then return true
+        if !self.scan_filt_svc_present && self.scan_filt_name.trim().is_empty() {
+            return true;
+        }
+
+        // check 1: svc-present bool is satisfied
+        if self.scan_filt_svc_present && !adv_dev.adv_data.services.contains(&btnus::NUS_SVC_UUID) {
+            return false;
+        }
+
+        // check 2: scan_filt_name is satisifed
+        if !self.scan_filt_name.is_empty() {
+            match adv_dev.adv_data.local_name.clone() {
+                Some(adv_dev_name) => {
+                    if !adv_dev_name.contains(&self.scan_filt_name) {
+                        return false;
+                    }
+                }
+                None => {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
 
