@@ -118,6 +118,12 @@ async fn bt_nus_setup_and_loop(
         if do_quit | do_disconnect {
             break;
         }
+        match device.is_connected().await {
+            true => {}
+            false => {
+                break;
+            }
+        }
 
         // TODO: do the tokio thing where you instruct...
         // "async wait on either of these things, and action whichever comes first"
