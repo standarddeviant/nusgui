@@ -1732,28 +1732,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
-name = "hope"
-version = "0.1.0"
-dependencies = [
- "bluest",
- "eframe",
- "egui 0.33.3",
- "egui-aesthetix",
- "egui-selectable-table",
- "egui_colors",
- "egui_extras",
- "egui_inbox",
- "flume",
- "futures-lite 2.6.1",
- "strum 0.28.0",
- "strum_macros 0.28.0",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "icu_collections"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2330,6 +2308,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "nusgui"
+version = "0.1.0"
+dependencies = [
+ "bluest",
+ "eframe",
+ "egui 0.33.3",
+ "egui-aesthetix",
+ "egui-selectable-table",
+ "egui_colors",
+ "egui_extras",
+ "egui_inbox",
+ "flume",
+ "futures-lite 2.6.1",
+ "strum 0.28.0",
+ "strum_macros 0.28.0",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

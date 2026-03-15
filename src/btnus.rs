@@ -220,6 +220,9 @@ pub fn spawn_btnus_thread(
                         }
                     }
                 }
+                if do_quit {
+                    break;
+                }
 
                 // NOTE: state 2-of-4: scanning
 

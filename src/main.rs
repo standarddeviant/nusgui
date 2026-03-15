@@ -1,3 +1,5 @@
+#![crate_name = "nusgui"]
+
 use core::f32;
 use std::collections::HashMap;
 
@@ -36,29 +38,51 @@ use strum_macros::{Display, EnumIter}; // 0.25
 //
 use flume::Sender;
 
+/// core struct representing the state of nusgui
 struct NusGui {
-    // NOTE: async/thread comms
+    /// (flume) Sender for gui->bt send comms
     cmd_tx: Sender<ThreadedNusMsg>,
-    inbox: UiInbox<ThreadedNusMsg>, // = UiInbox::new();
-    // resp_tx: UiInboxSender<ThreadedNusMsg>,
-    bt_state: ThreadedNusMsg,                        // = AmNotReady;
-    bt_handle: std::thread::JoinHandle<Option<u32>>, //
-    scan_vec: Vec<AdvertisingDevice>,                // = vec![];
-    scan_map: HashMap<DeviceId, AdvertisingDevice>,  // = HashMap::default();
-    // scan_columns: Vec<ScanColumns>,              //::iter().collect();
 
-    // Auto reload after each 10k table row add or modification
+    /// (egui_inbox) inbox (like Receiver) for gui<-bt recv comms
+    inbox: UiInbox<ThreadedNusMsg>,
+
+    /// message passed state of gui+bt threads
+    bt_state: ThreadedNusMsg,
+
+    /// bt thread handle
+    bt_handle: std::thread::JoinHandle<Option<u32>>,
+
+    /// vector of AdvertisingDevice objects from scan process
+    scan_vec: Vec<AdvertisingDevice>,
+
+    /// hashmap of AdvertisingDevice objects from scan process
+    scan_map: HashMap<DeviceId, AdvertisingDevice>,
+
+    /// scan results table
     table: SelectableTable<ScanRow, ScanColumns, ScanConfig>,
 
-    // actual nus text data
+    /// actual nus string data stored as single multiline string
     nus_tx_multi_string: String,
+
+    /// text input string from text input field
     nus_rx_single_string: String,
+
+    /// actual nus string from text input field
     nus_rx_history: Vec<String>,
+
+    /// position in input history lookup
     nus_rx_history_index: Option<usize>,
+
+    /// temporary state variable to 'snap the cursor' when updating input field from history
     nus_rx_snap_cursor: bool,
 
+    /// boolean latch to quit the application
     do_quit: bool,
+
+    /// boolean latch to run some code (1) time at init
     latch_once: bool,
+
+    /// color theme helper object
     colorix: Colorix,
 }
 
@@ -454,11 +478,6 @@ impl App for NusGui {
             // ??
         }
 
-        if self.do_quit {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            return;
-        }
-
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.draw_top_panel(ctx, ui);
         });
@@ -474,6 +493,11 @@ impl App for NusGui {
             // NOTE: update data from received messages in inbox
             self.process_inbox(ctx, ui);
 
+            if self.do_quit {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                return;
+            }
+
             // draw central panel
             self.draw_central_panel(ctx, ui);
         });
@@ -485,7 +509,7 @@ pub fn main() -> eframe::Result<()> {
     let filter = filter::Targets::new()
         // Enable the `INFO` level for anything in `my_crate`
         .with_default(LevelFilter::INFO)
-        .with_target("hope", LevelFilter::INFO)
+        .with_target("nusgui", LevelFilter::INFO)
         .with_target("bluest", LevelFilter::WARN);
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
