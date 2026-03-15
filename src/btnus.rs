@@ -53,7 +53,7 @@ pub enum ThreadedNusMsg {
     /// Not Ready State
     AmNotReady,
 
-    /// Not Ready State
+    /// Ready Idle State
     AmReadyIdle(String),
 
     /// Scanning State

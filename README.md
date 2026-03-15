@@ -2,8 +2,7 @@
 
 `nusgui` is a GUI application for communicating with BLE (Bluetooth Low Energy) devices that support the 'NUS' (Nordic UART Service) service to achieve serial port behavior.
 
-`nusgui` is written in Rust and leverages `egui` for the GUI and `bluest` for the BLE funtionality.
-
+`nusgui` is written in Rust and leverages `egui` for the GUI and `bluest` for the BLE functionality.
 If you don't already have a device that implements the NUS BLE service, the *Seeed Studio XIAO nRF54L15* is an inexpensive device that can be programmed with the `shell_bt_nus` example project from NCS (nRF Connect SDK).
 
 ## Note on `async` vs. non-`async`
@@ -16,7 +15,7 @@ To join the `async` BLE operations with the non-`async` GUI operations, we use
 This 'threaded communication' requires the definition of 'threaded messages'. For simplicity all messages in either direction are of the type, `ThreadedNusMsg` which is a rust enum that can communicate 
 - state (`Am...`) or 
 - commands (`Do...`) or 
-- data (`Data...`) or 
+- data (`Data...`)
 
 ## Installation
 
