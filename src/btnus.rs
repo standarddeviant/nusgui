@@ -11,8 +11,8 @@ use futures_lite::StreamExt;
 
 // use flume::async::RecvStream;
 use tokio::runtime::Runtime;
-use tokio::time::{Duration, timeout};
-use tracing::{debug, error, info, trace, warn};
+use tokio::time::Duration;
+use tracing::{debug, error, info, warn};
 // use tracing::{error, info, warn};
 
 use uuid::Uuid;
@@ -78,7 +78,6 @@ async fn bt_nus_setup_and_loop(
     resp: &egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> Result<bool, Box<dyn Error>> {
     let mut do_quit = false;
-    let mut do_disconnect = false;
 
     // make device connection
     let device = adapter.open_device(bt_id).await?;
@@ -122,14 +121,8 @@ async fn bt_nus_setup_and_loop(
     let _ = resp.send(AmConnected);
 
     loop {
-        if do_quit | do_disconnect {
+        if do_quit | !device.is_connected().await {
             break;
-        }
-        match device.is_connected().await {
-            true => {}
-            false => {
-                break;
-            }
         }
 
         // TODO: do the tokio thing where you instruct...
@@ -148,7 +141,6 @@ async fn bt_nus_setup_and_loop(
                     }
                     DoDisconnect => {
                         info!("recv'd DoDisconnect");
-                        do_disconnect = true;
                         break;
                     }
                     DataRx(rx_bytes) => {
