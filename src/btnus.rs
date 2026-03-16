@@ -133,60 +133,64 @@ async fn bt_nus_setup_and_loop(
         // "async wait on either of these things, and action whichever comes first"
 
         // 1. check input if we should Disconnect -OR- relay bytes to device via nus_rx_chr
-        loop {
-            // match cmd.recv_timeout(Duration::from_millis(10)) {
-            match timeout(Duration::from_millis(10), cmd.recv_async()).await {
-                Ok(Ok(DoQuit)) => {
-                    do_quit = true;
-                    info!("recv DoQuit");
-                    break;
-                }
-                Ok(Ok(DoDisconnect)) => {
-                    info!("recv'd DoDisconnect");
-                    do_disconnect = true;
-                    break;
-                }
-                Ok(Ok(DataRx(rx_bytes))) => {
-                    debug!("attempt send rx_bytes = {:?}", rx_bytes);
-                    match nus_rx_chr.write_without_response(&rx_bytes).await {
-                        Ok(_good) => {
-                            info!("success send rx_bytes = {rx_bytes:?}");
-                        }
-                        Err(e) => {
-                            error!("error send rx_bytes={rx_bytes:?} : {e}");
+        // loop {
+        // match cmd.recv_timeout(Duration::from_millis(10)) {
+        tokio::select! {
+            Ok(msg) = cmd.recv_async() => {
+                match msg {
+                    DoQuit => {
+                        do_quit = true;
+                        info!("recv DoQuit");
+                        break;
+                    }
+                    DoDisconnect => {
+                        info!("recv'd DoDisconnect");
+                        do_disconnect = true;
+                        break;
+                    }
+                    DataRx(rx_bytes) => {
+                        debug!("attempt send rx_bytes = {:?}", rx_bytes);
+                        match nus_rx_chr.write_without_response(&rx_bytes).await {
+                            Ok(_good) => {
+                                info!("success send rx_bytes = {rx_bytes:?}");
+                            }
+                            Err(e) => {
+                                error!("error send rx_bytes={rx_bytes:?} : {e}");
+                            }
                         }
                     }
-                }
-                Ok(Ok(unh)) => {
-                    warn!("unhandled msg = {unh:?}");
-                }
-                Ok(Err(e)) => {
-                    error!("{e}");
-                }
-                Err(elapsed) => {
-                    debug!("Timeout elapsed {elapsed}");
-                    break;
-                }
-            }
-        }
+                    unh => {
+                        warn!("unhandled msg = {unh:?}");
+                    }
 
-        // 2. check notifs via nus_tx_chr
-        match timeout(Duration::from_millis(10), nus_tx_notifs.next()).await {
-            Ok(Some(Ok(tx_bytes))) => {
-                info!("success notif tx_bytes.len() = {:?}", tx_bytes.len());
-                let _ = resp.send(DataTx(tx_bytes));
+                }
+            },
+            Some(Ok(tx_notif)) = nus_tx_notifs.next() => {
+                let _ = resp.send(DataTx(tx_notif));
             }
-            Ok(Some(Err(e))) => {
-                error!("hmm.. error = {e}");
-            }
-            Ok(None) => {
-                error!("hmm.. no tx bytes?");
-            }
-            Err(e) => {
-                debug!("elapsed {e}");
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
+                debug!("Timed out!");
             }
         }
     }
+
+    // 2. check notifs via nus_tx_chr
+    // match timeout(Duration::from_millis(10), nus_tx_notifs.next()).await {
+    //     Ok(Some(Ok(tx_bytes))) => {
+    //         info!("success notif tx_bytes.len() = {:?}", tx_bytes.len());
+    //         let _ = resp.send(DataTx(tx_bytes));
+    //     }
+    //     Ok(Some(Err(e))) => {
+    //         error!("hmm.. error = {e}");
+    //     }
+    //     Ok(None) => {
+    //         error!("hmm.. no tx bytes?");
+    //     }
+    //     Err(e) => {
+    //         debug!("elapsed {e}");
+    //     }
+    // }
+    // // }
 
     match adapter.disconnect_device(&device).await {
         Ok(_good) => {
@@ -328,7 +332,7 @@ pub fn spawn_btnus_thread(
                                 resp.send(DataScanResult(vec![discovered_device.clone()]))
                                     .ok();
                             },
-                            _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
+                            _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
                                 debug!("Timed out!");
                             }
                         } // end: tokio select!
