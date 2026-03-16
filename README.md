@@ -19,9 +19,15 @@ This 'threaded communication' requires the definition of 'threaded messages'. Fo
 
 ## Installation
 
+Install from git clone:
 ```bash
 git clone https://github.com/standarddeviant/nusgui.git
 cargo install --path .
+```
+
+Or install from cargo:
+```bash
+cargo install nusgui
 ```
 
 ## Usage
