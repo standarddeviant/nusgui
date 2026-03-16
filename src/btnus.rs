@@ -78,46 +78,49 @@ async fn bt_nus_setup_and_loop(
     resp: &egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> Result<bool, Box<dyn Error>> {
     let mut do_quit = false;
+    let mut do_disconnect = false;
+
     // make device connection
     let device = adapter.open_device(bt_id).await?;
     adapter.connect_device(&device).await?;
 
     // use device to obtain service
-    let nus_svc = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
-    let Some(nus_svc) = nus_svc.first() else {
+    let svc_vec = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
+    let Some(nus_svc) = svc_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS Service");
 
     // use service to obtain (RX) characteristic
-    let nus_rx_chr = nus_svc
+    let chr_vec = nus_svc
         .discover_characteristics_with_uuid(NUS_RX_CHR_UUID)
         .await?;
-    let Some(nus_rx_chr) = nus_rx_chr.first() else {
+    let Some(nus_rx_chr) = chr_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS RX");
 
     // use service to obtain (TX) characteristic
-    let nus_tx_chr = nus_svc
+    let chr_vec = nus_svc
         .discover_characteristics_with_uuid(NUS_TX_CHR_UUID)
         .await?;
-    let Some(nus_tx_chr) = nus_tx_chr.first() else {
+    let Some(nus_tx_chr) = chr_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS TX");
 
     // enable notifs on TX characteristic
-    let mut nus_tx_notifs = nus_tx_chr.notify().await?;
+    let Ok(mut nus_tx_notifs) = nus_tx_chr.notify().await else {
+        let _ = adapter.disconnect_device(&device).await?;
+        return Ok(false);
+    };
     info!("enabled notifs on NUS TX");
-
     info!("nus chars are ready!");
     let _ = resp.send(AmConnected);
 
-    let mut do_disconnect = false;
     loop {
         if do_quit | do_disconnect {
             break;
@@ -173,24 +176,6 @@ async fn bt_nus_setup_and_loop(
             }
         }
     }
-
-    // 2. check notifs via nus_tx_chr
-    // match timeout(Duration::from_millis(10), nus_tx_notifs.next()).await {
-    //     Ok(Some(Ok(tx_bytes))) => {
-    //         info!("success notif tx_bytes.len() = {:?}", tx_bytes.len());
-    //         let _ = resp.send(DataTx(tx_bytes));
-    //     }
-    //     Ok(Some(Err(e))) => {
-    //         error!("hmm.. error = {e}");
-    //     }
-    //     Ok(None) => {
-    //         error!("hmm.. no tx bytes?");
-    //     }
-    //     Err(e) => {
-    //         debug!("elapsed {e}");
-    //     }
-    // }
-    // // }
 
     match adapter.disconnect_device(&device).await {
         Ok(_good) => {
