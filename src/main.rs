@@ -8,10 +8,9 @@ use bluest::DeviceId;
 use eframe::egui::{Button, TopBottomPanel, Vec2};
 use eframe::{App, CreationContext, Frame, egui, epaint::Color32};
 use egui::RichText;
-use egui_colors::Colorix;
-// use egui_colors::{Colorix; ThemeColor};
 use egui::text::{CCursor, CCursorRange};
 use egui::{Align, CentralPanel, Context, Layout, ThemePreference, Ui};
+use egui_colors::Colorix;
 use egui_extras::Column;
 use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
@@ -84,14 +83,19 @@ struct NusGui {
     scan_filt_name: String,
 
     /// boolean latch to quit the application
+    #[serde(skip)]
     do_quit: bool,
 
     /// boolean latch to run some code (1) time at init
+    #[serde(skip)]
     latch_once: bool,
 
     /// color theme helper object
     #[serde(skip)]
     colorix: Colorix,
+
+    /// serializeable color theme
+    colorix_theme: egui_colors::Theme,
 }
 
 const PEACH32: Color32 = Color32::from_rgb(0xFF, 0xD3, 0xAC);
@@ -113,41 +117,25 @@ impl NusGui {
         cc.egui_ctx
             .options_mut(|a| a.theme_preference = ThemePreference::System);
 
-        // Otherwise, return default
+        // start with default with spawned bt thread + channels
         let mut out: NusGui = Default::default();
-        return out;
-        out.colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
 
         // load important fields manually for now
         if let Some(some_storage) = cc.storage {
-            if let Some(some_scan_filt_name) = some_storage.get_string("scan_filt_name") {
-                out.scan_filt_name = some_scan_filt_name
-                    .replace("\"", "")
-                    .replace("'", "")
-                    .replace("\\", "");
-            }
-            if let Some(some_scan_filt_svc_present) =
-                some_storage.get_string("scan_filt_svc_present")
-            {
-                match some_scan_filt_svc_present.parse::<bool>() {
-                    Ok(ok_bool) => {
-                        out.scan_filt_svc_present = ok_bool;
-                    }
-                    Err(e) => {
-                        error!("{e}");
-                    }
+            let maybe_save_state: Option<NusGui> = eframe::get_value(some_storage, eframe::APP_KEY);
+            match maybe_save_state {
+                Some(save_state) => {
+                    out.scan_filt_name = save_state.scan_filt_name;
+                    out.scan_filt_svc_present = save_state.scan_filt_svc_present;
+                    out.colorix_theme = save_state.colorix_theme;
+                    // out.colorix = save_state.colorix;
                 }
-                // match
+                None => {}
             }
         }
 
-        // if let Some(storage) = cc.storage {
-        //     if let Some(saved_state) = eframe::get_value(storage, eframe::APP_KEY) {
-        //         // let stored =
-        //         // TODO: how to 'overlay' fields from 'stored' on-top-of 'out'
-        //     }
-        // }
-        //
+        out.colorix = Colorix::global(ctx, out.colorix_theme.clone());
+
         out
     }
 
@@ -564,6 +552,7 @@ impl Default for NusGui {
         let nus_rx_snap_cursor = false;
 
         // let colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
+        let colorix_theme: egui_colors::Theme = egui_colors::utils::VERMILLION;
         let colorix = Colorix::default();
 
         Self {
@@ -587,6 +576,7 @@ impl Default for NusGui {
             do_quit: false,
             latch_once: true,
             colorix,
+            colorix_theme,
         }
     }
 }
@@ -594,13 +584,8 @@ impl Default for NusGui {
 impl App for NusGui {
     // Saved state is loaded here at startup
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.colorix_theme = self.colorix.theme().clone();
         eframe::set_value(storage, eframe::APP_KEY, self);
-        eframe::set_value(storage, "scan_filt_name", &self.scan_filt_name);
-        eframe::set_value(
-            storage,
-            "scan_filt_svc_present",
-            &self.scan_filt_svc_present,
-        );
     }
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         if self.latch_once {
