@@ -84,27 +84,31 @@ async fn bt_nus_setup_and_loop(
 
     // use device to obtain service
     let nus_svc = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
-    let nus_svc = nus_svc.get(0);
-    if nus_svc.is_none() {
+    let Some(nus_svc) = nus_svc.first() else {
+        let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
-    }
-
-    let nus_svc = nus_svc.unwrap();
+    };
     info!("found NUS Service");
 
     // use service to obtain (RX) characteristic
     let nus_rx_chr = nus_svc
         .discover_characteristics_with_uuid(NUS_RX_CHR_UUID)
         .await?;
-    let nus_rx_chr = &nus_rx_chr[0];
+    let Some(nus_rx_chr) = nus_rx_chr.first() else {
+        let _ = adapter.disconnect_device(&device).await?;
+        return Ok(false);
+    };
     info!("found NUS RX");
 
     // use service to obtain (TX) characteristic
     let nus_tx_chr = nus_svc
         .discover_characteristics_with_uuid(NUS_TX_CHR_UUID)
         .await?;
-    let nus_tx_chr = &nus_tx_chr[0];
-    info!("found NUS RX");
+    let Some(nus_tx_chr) = nus_tx_chr.first() else {
+        let _ = adapter.disconnect_device(&device).await?;
+        return Ok(false);
+    };
+    info!("found NUS TX");
 
     // enable notifs on TX characteristic
     let mut nus_tx_notifs = nus_tx_chr.notify().await?;
@@ -538,3 +542,4 @@ mod tests {
         }
     }
 }
+
