@@ -134,18 +134,19 @@ async fn bt_nus_setup_and_loop(
 
         // 1. check input if we should Disconnect -OR- relay bytes to device via nus_rx_chr
         loop {
-            match cmd.recv_timeout(Duration::from_millis(10)) {
-                Ok(DoQuit) => {
+            // match cmd.recv_timeout(Duration::from_millis(10)) {
+            match timeout(Duration::from_millis(10), cmd.recv_async()).await {
+                Ok(Ok(DoQuit)) => {
                     do_quit = true;
                     info!("recv DoQuit");
                     break;
                 }
-                Ok(DoDisconnect) => {
+                Ok(Ok(DoDisconnect)) => {
                     info!("recv'd DoDisconnect");
                     do_disconnect = true;
                     break;
                 }
-                Ok(DataRx(rx_bytes)) => {
+                Ok(Ok(DataRx(rx_bytes))) => {
                     debug!("attempt send rx_bytes = {:?}", rx_bytes);
                     match nus_rx_chr.write_without_response(&rx_bytes).await {
                         Ok(_good) => {
@@ -156,11 +157,14 @@ async fn bt_nus_setup_and_loop(
                         }
                     }
                 }
-                Ok(unh) => {
+                Ok(Ok(unh)) => {
                     warn!("unhandled msg = {unh:?}");
                 }
-                Err(rto) => {
-                    debug!("RecvTimeoutErr = {rto}");
+                Ok(Err(e)) => {
+                    error!("{e}");
+                }
+                Err(elapsed) => {
+                    debug!("Timeout elapsed {elapsed}");
                     break;
                 }
             }
