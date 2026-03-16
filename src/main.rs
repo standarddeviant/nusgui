@@ -15,28 +15,20 @@ use egui::{Align, CentralPanel, Context, Layout, ThemePreference, Ui};
 use egui_extras::Column;
 use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
-
-// use serde;
+use flume::Sender;
+use strum::IntoEnumIterator;
+use tracing::metadata::LevelFilter;
+use tracing::{error, info, warn};
+use tracing_subscriber::filter;
+use tracing_subscriber::prelude::*;
 
 mod btnus;
 mod scan_table;
 
+use btnus::ThreadedNusMsg;
 use btnus::ThreadedNusMsg::*;
 use btnus::spawn_btnus_thread;
-
-use tracing::metadata::LevelFilter;
-use tracing_subscriber::filter;
-use tracing_subscriber::prelude::*;
-
-use tracing::{error, info, warn};
-
-use crate::btnus::ThreadedNusMsg;
-use crate::scan_table::{ScanColumns, ScanConfig, ScanRow};
-
-use strum::IntoEnumIterator;
-// 0.25
-//
-use flume::Sender;
+use scan_table::{ScanColumns, ScanConfig, ScanRow};
 
 /// core struct representing the state of nusgui
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -123,6 +115,7 @@ impl NusGui {
 
         // Otherwise, return default
         let mut out: NusGui = Default::default();
+        return out;
         out.colorix = Colorix::global(ctx, egui_colors::utils::EGUI_THEME);
 
         // load important fields manually for now
@@ -875,4 +868,3 @@ mod tests {
         ));
     }
 }
-
