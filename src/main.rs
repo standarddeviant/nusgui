@@ -28,7 +28,7 @@ use tracing::metadata::LevelFilter;
 use tracing_subscriber::filter;
 use tracing_subscriber::prelude::*;
 
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::btnus::ThreadedNusMsg;
 use crate::scan_table::{ScanColumns, ScanConfig, ScanRow};
@@ -132,6 +132,19 @@ impl NusGui {
                     .replace("\"", "")
                     .replace("'", "")
                     .replace("\\", "");
+            }
+            if let Some(some_scan_filt_svc_present) =
+                some_storage.get_string("scan_filt_svc_present")
+            {
+                match some_scan_filt_svc_present.parse::<bool>() {
+                    Ok(ok_bool) => {
+                        out.scan_filt_svc_present = ok_bool;
+                    }
+                    Err(e) => {
+                        error!("{e}");
+                    }
+                }
+                // match
             }
         }
 
@@ -590,6 +603,11 @@ impl App for NusGui {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
         eframe::set_value(storage, "scan_filt_name", &self.scan_filt_name);
+        eframe::set_value(
+            storage,
+            "scan_filt_svc_present",
+            &self.scan_filt_svc_present,
+        );
     }
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         if self.latch_once {
@@ -680,7 +698,12 @@ mod tests {
 
     #[test]
     fn no_filters_matches_device_with_nus_service() {
-        assert!(scan_filt_check(false, "", &[NUS_SVC_UUID], Some("MyDevice")));
+        assert!(scan_filt_check(
+            false,
+            "",
+            &[NUS_SVC_UUID],
+            Some("MyDevice")
+        ));
     }
 
     #[test]
@@ -726,7 +749,12 @@ mod tests {
 
     #[test]
     fn name_filter_accepts_exact_match() {
-        assert!(scan_filt_check(false, "NordicDevice", &[], Some("NordicDevice")));
+        assert!(scan_filt_check(
+            false,
+            "NordicDevice",
+            &[],
+            Some("NordicDevice")
+        ));
     }
 
     #[test]
@@ -827,8 +855,7 @@ mod tests {
     }
 
     #[test]
-    fn name_filter_nonempty_but_svc_filter_off_accepts_device_with_matching_name_and_no_services()
-    {
+    fn name_filter_nonempty_but_svc_filter_off_accepts_device_with_matching_name_and_no_services() {
         // name matches, no services required since svc filter is off
         assert!(scan_filt_check(false, "XIAO", &[], Some("XIAO_BLE")));
     }
@@ -848,3 +875,4 @@ mod tests {
         ));
     }
 }
+
