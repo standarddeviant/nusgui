@@ -45,6 +45,7 @@ function ng
 Starting `nusgui` using `-WindowStyle Hidden` will hide the terminal window when running `nusgui`.
 
 The critical UI elements are:
+- Light/Dark Toggle and Theme Selection
 - Quit Button
 - Before Connection
     - Start Scan Button
