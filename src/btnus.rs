@@ -240,24 +240,30 @@ pub fn spawn_btnus_thread(
                 // NOTE: state 1b-of-4: idle (ready)
                 info!("btnus waiting for {:?}", DoScanStart("".into()));
                 loop {
-                    match cmd.recv_async().await {
-                        Ok(DoQuit) => {
-                            do_quit = true;
-                            break;
-                        }
-                        Ok(DoScanStart(_opts)) => {
-                            connect_bt_id = None;
-                            break;
-                        }
-                        Ok(DoConnect(bt_id)) => {
-                            connect_bt_id = Some(bt_id);
-                            break;
-                        }
-                        Ok(unh) => {
-                            warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
-                        }
-                        Err(_bad) => {
-                            //
+                    // Select between receiving the message or a 5-second timeout
+                    tokio::select! {
+                        Ok(msg) = cmd.recv_async() => {
+                            println!("recv'd: {:?}", msg);
+                            match msg {
+                                DoQuit => {
+                                    do_quit = true;
+                                    break;
+                                }
+                                DoScanStart(_opts) => {
+                                    connect_bt_id = None;
+                                    break;
+                                }
+                                DoConnect(bt_id) => {
+                                    connect_bt_id = Some(bt_id);
+                                    break;
+                                }
+                                unh => {
+                                    warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
+                                }
+                            }
+                        },
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
+                            debug!("Timed out!");
                         }
                     }
                 }
@@ -288,40 +294,45 @@ pub fn spawn_btnus_thread(
                     // if scan.is
                     // match
                     info!("scan started");
-                    while let Some(discovered_device) = scan.next().await {
-                        // TODO: put this timeout recv in a helper for readability
-                        // TODO: check if the sync method recv_timeout works just fine in here... it
-                        // should...
-                        match cmd.recv_timeout(Duration::from_millis(0)) {
-                            Ok(DoQuit) => {
-                                do_quit = true;
-                                break;
-                            }
-                            Ok(DoScanStop) => {
-                                info!("scan: recv'd DoScanStop, stopping scan");
-                                break;
-                            }
-                            // TODO: handle connect
-                            Ok(DoConnect(device_id)) => {
-                                info!("scan: recv'd DoScanStop, stopping scan");
-                                connect_bt_id = Some(device_id)
-                            }
-                            Ok(unhandled) => {
-                                warn!("scan: unhandled = {unhandled:?}");
-                            }
-                            Err(to) => {
-                                trace!("timeout waiting for msg during scan: {to}");
-                                //
-                            }
-                        }
 
-                        let k = discovered_device.device.id();
-                        let device = discovered_device.device.clone();
-                        scan_map.insert(k, device);
+                    loop {
+                        tokio::select! {
+                            Ok(msg) = cmd.recv_async() => {
+                                match msg {
+                                    DoQuit => {
+                                        do_quit = true;
+                                        break;
+                                    }
+                                    DoScanStop => {
+                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                        break;
+                                    }
+                                    // TODO: handle connect
+                                    DoConnect(device_id) => {
+                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                        connect_bt_id = Some(device_id)
+                                    }
+                                    unhandled => {
+                                        warn!("scan: unhandled = {unhandled:?}");
+                                    }
+                                }
+                            },
+                            Some(discovered_device) = scan.next() => {
+                                // TODO: put this timeout recv in a helper for readability
+                                // TODO: check if the sync method recv_timeout works just fine in here... it
+                                // should...
+                                let k = discovered_device.device.id();
+                                let device = discovered_device.device.clone();
+                                scan_map.insert(k, device);
 
-                        resp.send(DataScanResult(vec![discovered_device.clone()]))
-                            .ok();
-                    }
+                                resp.send(DataScanResult(vec![discovered_device.clone()]))
+                                    .ok();
+                            },
+                            _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
+                                debug!("Timed out!");
+                            }
+                        } // end: tokio select!
+                    } // end scan loop
                     info!("scan stopped");
                 } // end start-scan, i.e. if connect_bt_id.is_none()
 
@@ -546,4 +557,3 @@ mod tests {
         }
     }
 }
-
