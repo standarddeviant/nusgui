@@ -1,15 +1,20 @@
 [package]
 name = "nusgui"
-version = "0.1.0"
+version = "0.1.1"
+description = "GUI to communicate with BLE NUS devices"
 edition = "2024"
+license = "MIT"
 repository = "https://github.com/standarddeviant/nusgui"
+authors = ["Dave Crist"]
+rust-version = "1.88.0" # minimum supported Rust version
 
 [dependencies]
 bluest = "0.6.9"
 #
-eframe = "0.33.3"
-egui = "0.33.3"
+eframe = {version = "0.33.3", features = ["persistence"] }
+egui = {version ="0.33.3", features = ["persistence"] }
 egui-aesthetix = { version = "0.2.4", features = ["all_themes"] }
+egui_colors = "0.10.0"
 egui_extras = "0.33.3"
 egui_inbox = "0.10.0"
 egui-selectable-table = "0.5.0"
@@ -17,6 +22,7 @@ egui-selectable-table = "0.5.0"
 flume = { version="0.12.0", features=["async"]}
 futures-lite = "2.6.1"
 #
+serde = { version = "1.0.228", features = ["derive"] }
 strum = "0.28.0"
 strum_macros = "0.28.0"
 #
@@ -25,7 +31,6 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 #
 uuid = "1.22.0"
-egui_colors = "0.10.0"
 
 # The profile that 'dist' will build with
 [profile.dist]

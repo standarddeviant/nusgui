@@ -1,6 +1,21 @@
 # `nusgui`
 
-`nusgui` is a rust GUI for communicating with BLE (Bluetooth Low Energy) devices that support the 'NUS' service to achieve serial port behavior.
+`nusgui` is a GUI application for communicating with BLE (Bluetooth Low Energy) devices that support the 'NUS' (Nordic UART Service) service to achieve serial port behavior.
+
+`nusgui` is written in Rust and leverages `egui` for the GUI and `bluest` for the BLE functionality.
+If you don't already have a device that implements the NUS BLE service, the *Seeed Studio XIAO nRF54L15* is an inexpensive device that can be programmed with the `shell_bt_nus` example project from NCS (nRF Connect SDK).
+
+## Note on `async` vs. non-`async`
+Well supported, cross-platform Rust BLE crates require `async` code. 
+`egui` operations are not `async` since that would pause the main thread where the GUI is running.
+To join the `async` BLE operations with the non-`async` GUI operations, we use
+- `flume::unbounded()` channel for GUI -> BT communication
+- `egui_inbox::UiInbox` for GUI <- BT communication
+
+This 'threaded communication' requires the definition of 'threaded messages'. For simplicity all messages in either direction are of the type, `ThreadedNusMsg` which is a rust enum that can communicate 
+- state (`Am...`) or 
+- commands (`Do...`) or 
+- data (`Data...`)
 
 ## Installation
 
@@ -35,11 +50,11 @@ The critical UI elements are:
     - Disconnect Button
 
 ## Desired Features
-- [ ] Auto save/load program state to file
+- [x] Auto save/load program state to file
+- [x] Scan result filtering
 - [ ] Input history that filters based on current, unsent text in input field
 - [ ] Logging program events to file
 - [ ] Logging NUS payloads to file with optional timestamps
-- [ ] Scan result filtering
 - [ ] Support ANSI escape sequences for color support; leverage `egui_sgr` (RichText)
 
 ## Contributing
