@@ -3,7 +3,7 @@ members = ["cargo:."]
 
 # Config for 'dist'
 [dist]
-# enable this binary to be auditable
+# Whether to embed dependency information using cargo-auditable
 cargo-auditable = true
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.31.0"
