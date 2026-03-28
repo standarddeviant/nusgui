@@ -47,8 +47,6 @@ cargo zigbuild --release
 cp ./target/release/nusgui ~/.cargo/bin
 ```
 
-```
-
 ## Usage
 
 To run the program run `nusgui` from a terminal.
