@@ -296,7 +296,8 @@ pub fn spawn_btnus_thread(
                                     // TODO: handle connect
                                     DoConnect(device_id) => {
                                         info!("scan: recv'd DoScanStop, stopping scan");
-                                        connect_bt_id = Some(device_id)
+                                        connect_bt_id = Some(device_id);
+                                        break;
                                     }
                                     unhandled => {
                                         warn!("scan: unhandled = {unhandled:?}");
