@@ -30,6 +30,27 @@ Or install from cargo:
 cargo install nusgui
 ```
 
+
+### Failed Linux install re: `pkg-config`
+
+If the build fails due to lack of `pkg-config` configuration, cross-compiling with `cargo-zigbuild` may provide a workable solution.
+
+To use `cargo-auditable` and `cargo-zigbuild` together, try:
+```bash
+cargo install cargo-auditable cargo-zigbuild
+cargo auditable zigbuild --release
+cp ./target/release/nusgui ~/.cargo/bin
+```
+
+Or just `cargo-zigbuild` on its own
+```bash
+cargo install cargo-zigbuild
+cargo zigbuild --release
+cp ./target/release/nusgui ~/.cargo/bin
+```
+
+```
+
 ## Usage
 
 To run the program run `nusgui` from a terminal.
