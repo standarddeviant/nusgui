@@ -229,7 +229,7 @@ pub fn spawn_btnus_thread(
                     // Select between receiving the message or a 5-second timeout
                     tokio::select! {
                         Ok(msg) = cmd.recv_async() => {
-                            println!("recv'd: {:?}", msg);
+                            info!("recv'd: {:?}", msg);
                             match msg {
                                 DoQuit => {
                                     do_quit = true;
@@ -295,8 +295,9 @@ pub fn spawn_btnus_thread(
                                     }
                                     // TODO: handle connect
                                     DoConnect(device_id) => {
-                                        info!("scan: recv'd DoScanStop, stopping scan");
-                                        connect_bt_id = Some(device_id)
+                                        info!("scan: recv'd DoConnect, doing connect + stopping scan");
+                                        connect_bt_id = Some(device_id);
+                                        break;
                                     }
                                     unhandled => {
                                         warn!("scan: unhandled = {unhandled:?}");
