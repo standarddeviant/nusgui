@@ -22,20 +22,18 @@ This 'threaded communication' requires the definition of 'threaded messages'. Fo
 Install from git clone:
 ```bash
 git clone https://github.com/standarddeviant/nusgui.git
+cd nusgui
 cargo install --path .
 ```
 
-Or install from cargo:
-```bash
-cargo install nusgui
-```
+Or download a binary for macOS or Windows from the releases.
 
 
-### Failed Linux install re: `pkg-config`
+### Linux install
 
-If the build fails due to lack of `pkg-config` configuration, cross-compiling with `cargo-zigbuild` may provide a workable solution.
+If `cargo install --path .` fails due to lack of `pkg-config` configuration, cross-compiling with `cargo-zigbuild` may provide a workable solution.
 
-To use `cargo-auditable` and `cargo-zigbuild` together, try:
+To use `cargo-auditable` and `cargo-zigbuild` together, try this from the `nusgui` directory after cloning:
 ```bash
 cargo install cargo-auditable cargo-zigbuild
 cargo auditable zigbuild --release
