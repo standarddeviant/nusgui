@@ -10,9 +10,9 @@ use bluest::{Adapter, AdvertisingDevice, Device, DeviceId};
 use futures_lite::StreamExt;
 
 // use flume::async::RecvStream;
-use tokio::runtime::Runtime;
-use tokio::time::{Duration, timeout};
-use tracing::{debug, error, info, trace, warn};
+use tokio::runtime;
+use tokio::time::Duration;
+use tracing::{debug, error, info, warn};
 // use tracing::{error, info, warn};
 
 use uuid::Uuid;
@@ -78,112 +78,93 @@ async fn bt_nus_setup_and_loop(
     resp: &egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> Result<bool, Box<dyn Error>> {
     let mut do_quit = false;
+
     // make device connection
     let device = adapter.open_device(bt_id).await?;
     adapter.connect_device(&device).await?;
 
     // use device to obtain service
-    let nus_svc = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
-    let Some(nus_svc) = nus_svc.first() else {
+    let svc_vec = device.discover_services_with_uuid(NUS_SVC_UUID).await?;
+    let Some(nus_svc) = svc_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS Service");
 
     // use service to obtain (RX) characteristic
-    let nus_rx_chr = nus_svc
+    let chr_vec = nus_svc
         .discover_characteristics_with_uuid(NUS_RX_CHR_UUID)
         .await?;
-    let Some(nus_rx_chr) = nus_rx_chr.first() else {
+    let Some(nus_rx_chr) = chr_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS RX");
 
     // use service to obtain (TX) characteristic
-    let nus_tx_chr = nus_svc
+    let chr_vec = nus_svc
         .discover_characteristics_with_uuid(NUS_TX_CHR_UUID)
         .await?;
-    let Some(nus_tx_chr) = nus_tx_chr.first() else {
+    let Some(nus_tx_chr) = chr_vec.first() else {
         let _ = adapter.disconnect_device(&device).await?;
         return Ok(false);
     };
     info!("found NUS TX");
 
     // enable notifs on TX characteristic
-    let mut nus_tx_notifs = nus_tx_chr.notify().await?;
+    let Ok(mut nus_tx_notifs) = nus_tx_chr.notify().await else {
+        let _ = adapter.disconnect_device(&device).await?;
+        return Ok(false);
+    };
     info!("enabled notifs on NUS TX");
-
     info!("nus chars are ready!");
     let _ = resp.send(AmConnected);
 
-    let mut do_disconnect = false;
     loop {
-        if do_quit | do_disconnect {
+        if do_quit | !device.is_connected().await {
             break;
-        }
-        match device.is_connected().await {
-            true => {}
-            false => {
-                break;
-            }
         }
 
         // TODO: do the tokio thing where you instruct...
         // "async wait on either of these things, and action whichever comes first"
 
         // 1. check input if we should Disconnect -OR- relay bytes to device via nus_rx_chr
-        loop {
-            // match cmd.recv_timeout(Duration::from_millis(10)) {
-            match timeout(Duration::from_millis(10), cmd.recv_async()).await {
-                Ok(Ok(DoQuit)) => {
-                    do_quit = true;
-                    info!("recv DoQuit");
-                    break;
-                }
-                Ok(Ok(DoDisconnect)) => {
-                    info!("recv'd DoDisconnect");
-                    do_disconnect = true;
-                    break;
-                }
-                Ok(Ok(DataRx(rx_bytes))) => {
-                    debug!("attempt send rx_bytes = {:?}", rx_bytes);
-                    match nus_rx_chr.write_without_response(&rx_bytes).await {
-                        Ok(_good) => {
-                            info!("success send rx_bytes = {rx_bytes:?}");
-                        }
-                        Err(e) => {
-                            error!("error send rx_bytes={rx_bytes:?} : {e}");
+        // loop {
+        // match cmd.recv_timeout(Duration::from_millis(10)) {
+        tokio::select! {
+            Ok(msg) = cmd.recv_async() => {
+                match msg {
+                    DoQuit => {
+                        do_quit = true;
+                        info!("recv DoQuit");
+                        break;
+                    }
+                    DoDisconnect => {
+                        info!("recv'd DoDisconnect");
+                        break;
+                    }
+                    DataRx(rx_bytes) => {
+                        debug!("attempt send rx_bytes = {:?}", rx_bytes);
+                        match nus_rx_chr.write_without_response(&rx_bytes).await {
+                            Ok(_good) => {
+                                info!("success send rx_bytes = {rx_bytes:?}");
+                            }
+                            Err(e) => {
+                                error!("error send rx_bytes={rx_bytes:?} : {e}");
+                            }
                         }
                     }
-                }
-                Ok(Ok(unh)) => {
-                    warn!("unhandled msg = {unh:?}");
-                }
-                Ok(Err(e)) => {
-                    error!("{e}");
-                }
-                Err(elapsed) => {
-                    debug!("Timeout elapsed {elapsed}");
-                    break;
-                }
-            }
-        }
+                    unh => {
+                        warn!("unhandled msg = {unh:?}");
+                    }
 
-        // 2. check notifs via nus_tx_chr
-        match timeout(Duration::from_millis(10), nus_tx_notifs.next()).await {
-            Ok(Some(Ok(tx_bytes))) => {
-                info!("success notif tx_bytes.len() = {:?}", tx_bytes.len());
-                let _ = resp.send(DataTx(tx_bytes));
+                }
+            },
+            Some(Ok(tx_notif)) = nus_tx_notifs.next() => {
+                let _ = resp.send(DataTx(tx_notif));
             }
-            Ok(Some(Err(e))) => {
-                error!("hmm.. error = {e}");
-            }
-            Ok(None) => {
-                error!("hmm.. no tx bytes?");
-            }
-            Err(e) => {
-                debug!("elapsed {e}");
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
+                debug!("Timed out!");
             }
         }
     }
@@ -206,7 +187,12 @@ pub fn spawn_btnus_thread(
     resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> std::thread::JoinHandle<Option<u32>> {
     std::thread::spawn(move || {
-        let rt = Runtime::new().expect("Failed to create runtime");
+        // let mut rt = runtime::Runtime::new().expect("Failed to create runtime");
+        let rt = runtime::Builder::new_multi_thread()
+            .enable_time()
+            .enable_io()
+            .build()
+            .unwrap();
         rt.block_on(async {
             // continually loop through....
             // idle -> scanning -> connecting -> connected -> (back to idle)
@@ -240,24 +226,30 @@ pub fn spawn_btnus_thread(
                 // NOTE: state 1b-of-4: idle (ready)
                 info!("btnus waiting for {:?}", DoScanStart("".into()));
                 loop {
-                    match cmd.recv_async().await {
-                        Ok(DoQuit) => {
-                            do_quit = true;
-                            break;
-                        }
-                        Ok(DoScanStart(_opts)) => {
-                            connect_bt_id = None;
-                            break;
-                        }
-                        Ok(DoConnect(bt_id)) => {
-                            connect_bt_id = Some(bt_id);
-                            break;
-                        }
-                        Ok(unh) => {
-                            warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
-                        }
-                        Err(_bad) => {
-                            //
+                    // Select between receiving the message or a 5-second timeout
+                    tokio::select! {
+                        Ok(msg) = cmd.recv_async() => {
+                            println!("recv'd: {:?}", msg);
+                            match msg {
+                                DoQuit => {
+                                    do_quit = true;
+                                    break;
+                                }
+                                DoScanStart(_opts) => {
+                                    connect_bt_id = None;
+                                    break;
+                                }
+                                DoConnect(bt_id) => {
+                                    connect_bt_id = Some(bt_id);
+                                    break;
+                                }
+                                unh => {
+                                    warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
+                                }
+                            }
+                        },
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
+                            debug!("Timed out!");
                         }
                     }
                 }
@@ -288,40 +280,45 @@ pub fn spawn_btnus_thread(
                     // if scan.is
                     // match
                     info!("scan started");
-                    while let Some(discovered_device) = scan.next().await {
-                        // TODO: put this timeout recv in a helper for readability
-                        // TODO: check if the sync method recv_timeout works just fine in here... it
-                        // should...
-                        match cmd.recv_timeout(Duration::from_millis(0)) {
-                            Ok(DoQuit) => {
-                                do_quit = true;
-                                break;
-                            }
-                            Ok(DoScanStop) => {
-                                info!("scan: recv'd DoScanStop, stopping scan");
-                                break;
-                            }
-                            // TODO: handle connect
-                            Ok(DoConnect(device_id)) => {
-                                info!("scan: recv'd DoScanStop, stopping scan");
-                                connect_bt_id = Some(device_id)
-                            }
-                            Ok(unhandled) => {
-                                warn!("scan: unhandled = {unhandled:?}");
-                            }
-                            Err(to) => {
-                                trace!("timeout waiting for msg during scan: {to}");
-                                //
-                            }
-                        }
 
-                        let k = discovered_device.device.id();
-                        let device = discovered_device.device.clone();
-                        scan_map.insert(k, device);
+                    loop {
+                        tokio::select! {
+                            Ok(msg) = cmd.recv_async() => {
+                                match msg {
+                                    DoQuit => {
+                                        do_quit = true;
+                                        break;
+                                    }
+                                    DoScanStop => {
+                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                        break;
+                                    }
+                                    // TODO: handle connect
+                                    DoConnect(device_id) => {
+                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                        connect_bt_id = Some(device_id)
+                                    }
+                                    unhandled => {
+                                        warn!("scan: unhandled = {unhandled:?}");
+                                    }
+                                }
+                            },
+                            Some(discovered_device) = scan.next() => {
+                                // TODO: put this timeout recv in a helper for readability
+                                // TODO: check if the sync method recv_timeout works just fine in here... it
+                                // should...
+                                let k = discovered_device.device.id();
+                                let device = discovered_device.device.clone();
+                                scan_map.insert(k, device);
 
-                        resp.send(DataScanResult(vec![discovered_device.clone()]))
-                            .ok();
-                    }
+                                resp.send(DataScanResult(vec![discovered_device.clone()]))
+                                    .ok();
+                            },
+                            _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
+                                debug!("Timed out!");
+                            }
+                        } // end: tokio select!
+                    } // end scan loop
                     info!("scan stopped");
                 } // end start-scan, i.e. if connect_bt_id.is_none()
 
@@ -546,4 +543,3 @@ mod tests {
         }
     }
 }
-

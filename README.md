@@ -19,9 +19,32 @@ This 'threaded communication' requires the definition of 'threaded messages'. Fo
 
 ## Installation
 
+Install from git clone:
 ```bash
 git clone https://github.com/standarddeviant/nusgui.git
+cd nusgui
 cargo install --path .
+```
+
+Or download a binary for macOS or Windows from the releases.
+
+
+### Linux install
+
+If `cargo install --path .` fails due to lack of `pkg-config` configuration, cross-compiling with `cargo-zigbuild` may provide a workable solution.
+
+To use `cargo-auditable` and `cargo-zigbuild` together, try this from the `nusgui` directory after cloning:
+```bash
+cargo install cargo-auditable cargo-zigbuild
+cargo auditable zigbuild --release
+cp ./target/release/nusgui ~/.cargo/bin
+```
+
+Or just `cargo-zigbuild` on its own
+```bash
+cargo install cargo-zigbuild
+cargo zigbuild --release
+cp ./target/release/nusgui ~/.cargo/bin
 ```
 
 ## Usage
@@ -39,6 +62,7 @@ function ng
 Starting `nusgui` using `-WindowStyle Hidden` will hide the terminal window when running `nusgui`.
 
 The critical UI elements are:
+- Light/Dark Toggle and Theme Selection
 - Quit Button
 - Before Connection
     - Start Scan Button
