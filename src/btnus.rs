@@ -295,7 +295,7 @@ pub fn spawn_btnus_thread(
                                     }
                                     // TODO: handle connect
                                     DoConnect(device_id) => {
-                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                        info!("scan: recv'd DoConnect, doing connect + stopping scan");
                                         connect_bt_id = Some(device_id);
                                         break;
                                     }
