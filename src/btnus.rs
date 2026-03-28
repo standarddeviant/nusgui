@@ -229,7 +229,7 @@ pub fn spawn_btnus_thread(
                     // Select between receiving the message or a 5-second timeout
                     tokio::select! {
                         Ok(msg) = cmd.recv_async() => {
-                            println!("recv'd: {:?}", msg);
+                            info!("recv'd: {:?}", msg);
                             match msg {
                                 DoQuit => {
                                     do_quit = true;
