@@ -14,7 +14,7 @@ use egui_inbox::UiInbox;
 use egui_selectable_table::SelectableTable;
 use flume::Sender;
 use strum::IntoEnumIterator;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::btnus::{NUS_SVC_UUID, ThreadedNusMsg, ThreadedNusMsg::*, spawn_btnus_thread};
 use crate::scan_table::{ScanColumns, ScanConfig, ScanRow};
@@ -610,11 +610,14 @@ impl App for NusGui {
 }
 
 fn scan_obj_to_scan_row(scan_obj: &AdvertisingDevice) -> ScanRow {
-    ScanRow {
-        bt_id: Some(scan_obj.device.id()),
-        name: scan_obj.device.name().unwrap_or("n/a".into()),
-        rssi: scan_obj.rssi.unwrap_or(-200_i16),
-    }
+    debug!("scan_obj: {:?}", scan_obj);
+    let bt_id = Some(scan_obj.device.id());
+    let name: String = match &scan_obj.adv_data.local_name {
+        Some(name) => name.clone(),
+        None => "na".into(),
+    };
+    let rssi = scan_obj.rssi.unwrap_or(-200_i16);
+    ScanRow { bt_id, name, rssi }
 }
 
 #[cfg(test)]

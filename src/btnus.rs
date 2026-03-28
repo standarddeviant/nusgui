@@ -10,7 +10,7 @@ use bluest::{Adapter, AdvertisingDevice, Device, DeviceId};
 use futures_lite::StreamExt;
 
 // use flume::async::RecvStream;
-use tokio::runtime::Runtime;
+use tokio::runtime;
 use tokio::time::Duration;
 use tracing::{debug, error, info, warn};
 // use tracing::{error, info, warn};
@@ -187,7 +187,12 @@ pub fn spawn_btnus_thread(
     resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> std::thread::JoinHandle<Option<u32>> {
     std::thread::spawn(move || {
-        let rt = Runtime::new().expect("Failed to create runtime");
+        // let mut rt = runtime::Runtime::new().expect("Failed to create runtime");
+        let rt = runtime::Builder::new_multi_thread()
+            .enable_time()
+            .enable_io()
+            .build()
+            .unwrap();
         rt.block_on(async {
             // continually loop through....
             // idle -> scanning -> connecting -> connected -> (back to idle)
