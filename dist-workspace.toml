@@ -21,3 +21,7 @@ install-updater = true
 [dist.dependencies.apt]
 libdbus-1-dev = '*'
 pkg-config = '*'
+zig = '*'
+
+[target.x86_64-unknown-linux-musl]
+linker = "zig cc"
