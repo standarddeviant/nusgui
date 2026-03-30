@@ -209,10 +209,12 @@ impl NusGui {
                             Some(index) => {
                                 let vtmp: Vec<u8> = self.nus_tx_agg_bytes.drain(0..index).collect();
                                 let stmp = String::from_utf8_lossy(&vtmp);
-                                let vrich = egui_sgr::ansi_to_rich_text(&stmp); //  -> Vec<RichText>
+                                let vrich = egui_sgr::ansi_to_rich_text(&stmp.trim()); //  -> Vec<RichText>
                                 self.nus_tx_rich_lines.push(vrich);
                             }
-                            None => {}
+                            None => {
+                                break;
+                            }
                         };
                     }
 
@@ -319,7 +321,7 @@ impl NusGui {
                 });
             }
             AmConnected => {
-                self.draw_central_panel_connected(ui);
+                self.draw_central_panel_connected(_ctx, ui);
             }
             unhandled => {
                 ui.label(format!(
@@ -420,50 +422,91 @@ impl NusGui {
     } // end draw_central_panel
 
     /// convenience function to draw central panel of GUI when connected to a NUS capable device
-    fn draw_central_panel_connected(&mut self, ui: &mut Ui) {
+    fn draw_central_panel_connected(&mut self, ctx: &Context, ui: &mut Ui) {
         // TODO: add multiline text edit via ui.enabled(false) w/ diff. APIs
         //       reason: adding .interactive(false) to multiline TextEdit makes the text
         //       unselectable and uncopy-able
-        let text_color = ui.visuals().text_color();
-        egui::ScrollArea::both()
-            .auto_shrink(false)
-            .max_height(ui.available_height() - 30.0)
-            .stick_to_bottom(true)
-            .show(ui, |ui| {
-                ui.add_enabled(
-                    true,
-                    egui::TextEdit::multiline(&mut self.nus_tx_multi_string.to_owned())
-                        .font(egui::TextStyle::Monospace) // Monospace for terminal look
-                        .desired_width(f32::INFINITY)
-                        // .min_size(Vec2::new(ui.available_width(), ui.available_height()))
-                        .min_size(ui.available_size())
-                        .interactive(true)
-                        .frame(true)
-                        .text_color(text_color), // .text_color(egui::Color32::from_rgb(0xDD, 0xDD, 0xDD)),
-                                                 // .show(ui);
-                );
-            });
+        // let text_color = ui.visuals().text_color();
+        // egui::ScrollArea::both()
+        //     .auto_shrink(false)
+        //     .max_height(ui.available_height() - 30.0)
+        //     .stick_to_bottom(true)
+        //     .show(ui, |ui| {
+        //         ui.add_enabled(
+        //             true,
+        //             egui::TextEdit::multiline(&mut self.nus_tx_multi_string.to_owned())
+        //                 .font(egui::TextStyle::Monospace) // Monospace for terminal look
+        //                 .desired_width(f32::INFINITY)
+        //                 // .min_size(Vec2::new(ui.available_width(), ui.available_height()))
+        //                 .min_size(ui.available_size())
+        //                 .interactive(true)
+        //                 .frame(true)
+        //                 .text_color(text_color), // .text_color(egui::Color32::from_rgb(0xDD, 0xDD, 0xDD)),
+        //                                          // .show(ui);
+        //         );
+        //     });
 
         let height = egui::TextStyle::Body.resolve(ui.style()).size; // Determine standard row height
         let num_rows = self.nus_tx_rich_lines.len();
-        egui::ScrollArea::both() //
-            .auto_shrink(false) //
-            .max_height(ui.available_height() - 30.0) //
-            .stick_to_bottom(true) //
-            .show_rows(ui, height, num_rows, |ui, row_range| {
-                for _ix in row_range {
-                    ui.horizontal(|ui| {
-                        for itm in &self.nus_tx_rich_lines[_ix] {
-                            ui.label(itm.clone());
-                        }
-                        //
-                    });
-                    // Fetch and display only the items in the visible range
-                    // if let Some(value) = self.values.get(i) {
-                    // ui.label(format!("Item number: {}", value));
-                    // }
-                }
-            });
+
+        let desired_height = ui.available_height() - 35.0;
+
+        // 1. Define the frame style with a border
+        let frame = egui::Frame::new()
+            .fill(ctx.style().visuals.window_fill)
+            // .fill(Color32::from_rgb(30, 30, 30)) // Optional: set a background color
+            .stroke(egui::Stroke::new(2.0, Color32::from_rgb(200, 200, 200))) // Add a 2px border
+            .inner_margin(5.0); // Optional: add some padding inside the frame
+
+        // 2. Show the frame, which contains the ScrollArea
+        frame.show(ui, |ui| {
+            ui.set_max_height(desired_height);
+            egui::ScrollArea::both() //
+                .auto_shrink(false) //
+                // .max_height(ui.available_height() - 30.0) //
+                .stick_to_bottom(true) //
+                .show_rows(ui, height, num_rows, |ui, row_range| {
+                    for _ix in row_range {
+                        ui.horizontal(|ui| {
+                            for itm in &self.nus_tx_rich_lines[_ix] {
+                                ui.label(itm.clone().monospace());
+                            }
+                            //
+                        });
+
+                        // Fetch and display only the items in the visible range
+                        // if let Some(value) = self.values.get(i) {
+                        // ui.label(format!("Item number: {}", value));
+                        // }
+                    }
+                });
+        });
+
+        // ui.add_sized(
+        //     egui::vec2(ui.available_width(), desired_height),
+        //     |ui: &mut egui::Ui| {
+        //         // ui.label("Filled Frame") //
+        //         egui::ScrollArea::both() //
+        //             .auto_shrink(false) //
+        //             // .max_height(ui.available_height() - 30.0) //
+        //             .stick_to_bottom(true) //
+        //             .show_rows(ui, height, num_rows, |ui, row_range| {
+        //                 for _ix in row_range {
+        //                     ui.horizontal(|ui| {
+        //                         for itm in &self.nus_tx_rich_lines[_ix] {
+        //                             ui.label(itm.clone().monospace());
+        //                         }
+        //                         //
+        //                     });
+        //
+        //                     // Fetch and display only the items in the visible range
+        //                     // if let Some(value) = self.values.get(i) {
+        //                     // ui.label(format!("Item number: {}", value));
+        //                     // }
+        //                 }
+        //             });
+        //     },
+        // );
 
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.horizontal(|ui| {

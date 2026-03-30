@@ -161,6 +161,7 @@ async fn bt_nus_setup_and_loop(
                 }
             },
             Some(Ok(tx_notif)) = nus_tx_notifs.next() => {
+                debug!("sending {tx_notif:?}");
                 let _ = resp.send(DataTx(tx_notif));
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
