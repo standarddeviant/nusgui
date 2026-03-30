@@ -1,5 +1,5 @@
 use core::f32;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use bluest::AdvertisingDevice;
 use bluest::DeviceId;
@@ -53,6 +53,13 @@ pub struct NusGui {
 
     /// actual nus string data stored as single multiline string
     nus_tx_multi_string: String,
+
+    /// actual nus bytes stored as Vec<u8>, must be mutable
+    nus_tx_agg_bytes: VecDeque<u8>,
+
+    /// nus lines stored as Vec<Vec<RichText>>, must be mutable
+    #[serde(skip)]
+    nus_tx_rich_lines: Vec<Vec<RichText>>,
 
     /// text input string from text input field
     nus_rx_single_string: String,
@@ -183,8 +190,34 @@ impl NusGui {
                 DataTx(nus_tx_bytes) => {
                     // TODO: implement a more robust strategy for handling utf8 errors...
                     //       using lossy function is okay for now
-                    let tmp_str = String::from_utf8_lossy(&nus_tx_bytes);
-                    self.nus_tx_multi_string.push_str(&tmp_str);
+                    self.nus_tx_agg_bytes.extend(&nus_tx_bytes.clone());
+
+                    loop {
+                        if self.nus_tx_agg_bytes.is_empty() {
+                            break;
+                        }
+
+                        let maybe_index = self
+                            .nus_tx_agg_bytes
+                            .clone()
+                            .iter()
+                            .position(|&b| 0x0A == b || 0x0A == b);
+                        match maybe_index {
+                            Some(0) => {
+                                self.nus_tx_agg_bytes.remove(0);
+                            }
+                            Some(index) => {
+                                let vtmp: Vec<u8> = self.nus_tx_agg_bytes.drain(0..index).collect();
+                                let stmp = String::from_utf8_lossy(&vtmp);
+                                let vrich = egui_sgr::ansi_to_rich_text(&stmp); //  -> Vec<RichText>
+                                self.nus_tx_rich_lines.push(vrich);
+                            }
+                            None => {}
+                        };
+                    }
+
+                    // let tmp_str = String::from_utf8_lossy(&nus_tx_bytes);
+                    // self.nus_tx_multi_string.push_str(&tmp_str);
 
                     // TODO: add incremental file logging here
                 }
@@ -411,6 +444,27 @@ impl NusGui {
                 );
             });
 
+        let height = egui::TextStyle::Body.resolve(ui.style()).size; // Determine standard row height
+        let num_rows = self.nus_tx_rich_lines.len();
+        egui::ScrollArea::both() //
+            .auto_shrink(false) //
+            .max_height(ui.available_height() - 30.0) //
+            .stick_to_bottom(true) //
+            .show_rows(ui, height, num_rows, |ui, row_range| {
+                for _ix in row_range {
+                    ui.horizontal(|ui| {
+                        for itm in &self.nus_tx_rich_lines[_ix] {
+                            ui.label(itm.clone());
+                        }
+                        //
+                    });
+                    // Fetch and display only the items in the visible range
+                    // if let Some(value) = self.values.get(i) {
+                    // ui.label(format!("Item number: {}", value));
+                    // }
+                }
+            });
+
         ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new("Send: ").monospace());
@@ -536,6 +590,8 @@ impl Default for NusGui {
         let _bt_handle: std::thread::JoinHandle<Option<u32>> = spawn_btnus_thread(cmd_rx, resp_tx);
 
         let nus_tx_multi_string: String = "".into();
+        let nus_tx_agg_bytes = VecDeque::new();
+        let nus_tx_rich_lines = vec![];
         let nus_rx_single_string: String = "".into();
         let nus_rx_history = vec![];
         let nus_rx_history_index = None;
@@ -555,6 +611,8 @@ impl Default for NusGui {
             // scan_columns,
             table,
             nus_tx_multi_string,
+            nus_tx_agg_bytes,
+            nus_tx_rich_lines,
             nus_rx_single_string,
             nus_rx_history,
             nus_rx_history_index,
