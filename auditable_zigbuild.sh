@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 # install tools
 cargo install cargo-auditable cargo-zigbuild
 
