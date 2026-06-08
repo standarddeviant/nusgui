@@ -26,12 +26,13 @@ serde = { version = "1.0.228", features = ["derive"] }
 strum = "0.28.0"
 strum_macros = "0.28.0"
 #
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.52.1", features = ["full"] }
 tracing = "0.1.44"
-tracing-subscriber = "0.3.22"
+tracing-subscriber = "0.3.23"
 #
 uuid = "1.22.0"
 egui_sgr = "0.1.6"
+smlang = "0.8.0"
 
 # The profile that 'dist' will build with
 [profile.dist]
