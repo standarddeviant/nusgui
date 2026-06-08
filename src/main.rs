@@ -20,8 +20,8 @@ pub fn main() -> eframe::Result<()> {
         .with_target("nusgui", LevelFilter::INFO)
         .with_target("bluest", LevelFilter::WARN);
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(filter)
+        .with(tracing_subscriber::fmt::layer().boxed())
+        .with(filter.boxed())
         .init();
 
     let options = eframe::NativeOptions {

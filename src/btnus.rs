@@ -3,13 +3,14 @@
 // use std::time::Duration;
 
 use std::collections::HashMap;
-use std::error::Error;
+// use std::error::Error as StdError;
+
+use smlang::statemachine;
 
 use bluest::{Adapter, AdvertisingDevice, Device, DeviceId};
 
 use futures_lite::StreamExt;
 
-// use flume::async::RecvStream;
 use tokio::runtime;
 use tokio::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -26,30 +27,6 @@ pub const NUS_TX_CHR_UUID: Uuid = Uuid::from_u128(0x6E400003_B5A3_F393_E0A9_E50E
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThreadedNusMsg {
-    /// Command to start scanning
-    DoScanStart(String), // FIXME: put scan params as a type in this event
-
-    /// Command to stop scanning
-    DoScanStop,
-
-    /// Command to connect
-    DoConnect(DeviceId),
-
-    /// Command to disconnect
-    DoDisconnect,
-
-    /// Command to quit
-    DoQuit,
-
-    /// Scan result data
-    DataScanResult(Vec<AdvertisingDevice>),
-
-    /// NUS TX bytes (BLE notif from device)
-    DataTx(Vec<u8>),
-
-    /// NUS RX bytes (BLE write to device)
-    DataRx(Vec<u8>),
-
     /// Not Ready State
     AmNotReady,
 
@@ -67,8 +44,202 @@ pub enum ThreadedNusMsg {
 
     /// 'Quitted' State
     AmQuitted,
+
+    /// Scan result data
+    DataScanResult(Vec<AdvertisingDevice>),
+
+    /// NUS TX bytes (BLE notif from device)
+    DataTx(Vec<u8>),
+
+    /// NUS RX bytes (BLE write to device)
+    DataRx(Vec<u8>),
+
+    /// Command to get ready
+    DoGetReady,
+
+    /// Command to start scanning
+    DoScanStart(String), // FIXME: put scan params as a type in this event
+
+    /// Command to stop scanning
+    DoScanStop,
+
+    /// Command to connect
+    DoConnect(DeviceId),
+
+    /// Command to disconnect
+    DoDisconnect,
+
+    /// Command to quit
+    DoQuit,
 }
 use ThreadedNusMsg::*;
+
+statemachine! {
+    name: Ble,
+    derive_states: [Debug, Clone],
+    derive_events: [Debug, Clone],
+    transitions: {
+        *AmNotReady + DoGetReady [try_get_ready] / success_get_ready = AmReadyIdle,
+
+        AmReadyIdle + DoScanStart(String) [try_scan_start] / success_scan_start = AmScanning,
+
+        AmScanning + DoScanStop [try_scan_stop] / success_scan_stop = AmReadyIdle,
+        AmScanning + DoConnect(DeviceId) [try_connect_start] / success_connect_start = AmConnecting,
+
+        AmConnecting + ConnectComplete [try_connect_finish] / success_connect_finish = AmConnected,
+        AmConnecting + DoDisconnect [try_connect_fail] / success_connect_fail = AmReadyIdle,
+
+        AmConnected + DoDisconnect [try_disconnect] / success_disconnect = AmReadyIdle,
+
+        _ + DoQuit [try_quit] / success_quit = AmQuitted,
+        AmQuitted + DoQuit = AmQuitted,
+    }
+}
+
+pub struct Context {
+    cmd: flume::Receiver<ThreadedNusMsg>,
+    resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
+    adapter: Option<Adapter>,
+    connect_bt_id: Option<DeviceId>,
+    scan_map: HashMap<DeviceId, Device>,
+}
+
+impl Context {
+    fn new(
+        cmd: flume::Receiver<ThreadedNusMsg>,
+        resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
+    ) -> Self {
+        Self {
+            cmd,
+            resp,
+            adapter: None,
+            connect_bt_id: None,
+            scan_map: HashMap::new(),
+        }
+    }
+}
+
+impl BleStateMachineContext for Context {
+    fn try_get_ready(&self) -> Result<bool, ()> {
+        Ok(self.adapter.is_some())
+    }
+
+    fn success_get_ready(&mut self) -> Result<(), ()> {
+        if let Some(adapter) = &self.adapter {
+            let _ = self.resp.send(AmReadyIdle(format!("{:?}", adapter)));
+        }
+        Ok(())
+    }
+
+    fn try_scan_start(&self, _scan_opts: &String) -> Result<bool, ()> {
+        Ok(self.adapter.is_some())
+    }
+
+    fn success_scan_start(&mut self, _scan_opts: String) -> Result<(), ()> {
+        let _ = self.resp.send(AmScanning);
+        Ok(())
+    }
+
+    fn try_scan_stop(&self) -> Result<bool, ()> {
+        Ok(true)
+    }
+
+    fn success_scan_stop(&mut self) -> Result<(), ()> {
+        if let Some(adapter) = &self.adapter {
+            let _ = self.resp.send(AmReadyIdle(format!("{:?}", adapter)));
+        }
+        Ok(())
+    }
+
+    fn try_connect_start(&self, _bt_id: &DeviceId) -> Result<bool, ()> {
+        Ok(true)
+    }
+
+    fn success_connect_start(&mut self, bt_id: DeviceId) -> Result<(), ()> {
+        self.connect_bt_id = Some(bt_id);
+        let _ = self.resp.send(AmConnecting);
+        Ok(())
+    }
+
+    fn try_connect_finish(&self) -> Result<bool, ()> {
+        Ok(self.connect_bt_id.is_some())
+    }
+
+    fn success_connect_finish(&mut self) -> Result<(), ()> {
+        let _ = self.resp.send(AmConnected);
+        Ok(())
+    }
+
+    fn try_connect_fail(&self) -> Result<bool, ()> {
+        Ok(true)
+    }
+
+    fn success_connect_fail(&mut self) -> Result<(), ()> {
+        self.connect_bt_id = None;
+        if let Some(adapter) = &self.adapter {
+            let _ = self.resp.send(AmReadyIdle(format!("{:?}", adapter)));
+        }
+        Ok(())
+    }
+
+    fn try_disconnect(&self) -> Result<bool, ()> {
+        Ok(true)
+    }
+
+    fn success_disconnect(&mut self) -> Result<(), ()> {
+        self.connect_bt_id = None;
+        if let Some(adapter) = &self.adapter {
+            let _ = self.resp.send(AmReadyIdle(format!("{:?}", adapter)));
+        }
+        Ok(())
+    }
+
+    fn try_quit(&self) -> Result<bool, ()> {
+        Ok(true)
+    }
+
+    fn success_quit(&mut self) -> Result<(), ()> {
+        let _ = self.resp.send(AmQuitted);
+        Ok(())
+    }
+}
+
+fn msg_to_event(msg: &ThreadedNusMsg) -> Option<BleEvents> {
+    match msg {
+        ThreadedNusMsg::DoGetReady => Some(BleEvents::DoGetReady),
+        ThreadedNusMsg::DoScanStart(opts) => Some(BleEvents::DoScanStart(opts.clone())),
+        ThreadedNusMsg::DoScanStop => Some(BleEvents::DoScanStop),
+        ThreadedNusMsg::DoConnect(bt_id) => Some(BleEvents::DoConnect(bt_id.clone())),
+        ThreadedNusMsg::DoDisconnect => Some(BleEvents::DoDisconnect),
+        ThreadedNusMsg::DoQuit => Some(BleEvents::DoQuit),
+        _ => None,
+    }
+}
+
+fn handle_event(
+    sm: &mut BleStateMachine<Context>,
+    msg: ThreadedNusMsg,
+) {
+    info!("recv'd: {:?}", msg);
+    if let Some(event) = msg_to_event(&msg) {
+        match sm.process_event(event) {
+            Ok(new_state) => {
+                debug!("transition to {:?}", new_state);
+            }
+            Err(BleError::GuardFailed(_)) => {
+                warn!("guard failed for event");
+            }
+            Err(BleError::InvalidEvent) => {
+                warn!("invalid event for current state");
+            }
+            Err(BleError::TransitionsFailed) | Err(BleError::ActionFailed(_)) => {
+                warn!("transition/action failed");
+            }
+        }
+    } else {
+        warn!("unhandled message = {:?}", msg);
+    }
+}
 
 /// async function to handle connection and active use for NUS data transfer
 async fn bt_nus_setup_and_loop(
@@ -76,7 +247,7 @@ async fn bt_nus_setup_and_loop(
     bt_id: &DeviceId,
     cmd: &flume::Receiver<ThreadedNusMsg>,
     resp: &egui_inbox::UiInboxSender<ThreadedNusMsg>,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<bool, Box<dyn std::error::Error>> {
     let mut do_quit = false;
 
     // make device connection
@@ -118,10 +289,9 @@ async fn bt_nus_setup_and_loop(
     };
     info!("enabled notifs on NUS TX");
     info!("nus chars are ready!");
-    let _ = resp.send(AmConnected);
 
     loop {
-        if do_quit | !device.is_connected().await {
+        if do_quit || !device.is_connected().await {
             break;
         }
 
@@ -161,6 +331,7 @@ async fn bt_nus_setup_and_loop(
                 }
             },
             Some(Ok(tx_notif)) = nus_tx_notifs.next() => {
+                debug!("sending {tx_notif:?}");
                 let _ = resp.send(DataTx(tx_notif));
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
@@ -187,171 +358,153 @@ pub fn spawn_btnus_thread(
     resp: egui_inbox::UiInboxSender<ThreadedNusMsg>,
 ) -> std::thread::JoinHandle<Option<u32>> {
     std::thread::spawn(move || {
-        // let mut rt = runtime::Runtime::new().expect("Failed to create runtime");
         let rt = runtime::Builder::new_multi_thread()
             .enable_time()
             .enable_io()
             .build()
             .unwrap();
         rt.block_on(async {
-            // continually loop through....
-            // idle -> scanning -> connecting -> connected -> (back to idle)
-            let mut do_quit = false;
+            let ctx = Context::new(cmd, resp);
+            let mut sm = BleStateMachine::new(ctx);
+
             loop {
-                if do_quit {
-                    break;
-                }
-                // NOTE: state 1a-of-4: idle (not ready)
-                let mut connect_bt_id: Option<DeviceId>;
-                let mut scan_map: HashMap<DeviceId, Device> = HashMap::new();
-                let mut option_adapter: Option<Adapter>;
-                loop {
-                    // TODO: put this in an async function that returns result and use ? operator???
-                    option_adapter = Adapter::default().await;
-                    if option_adapter.is_none() {
-                        resp.send(AmNotReady).ok();
-                        std::thread::sleep(Duration::from_millis(1000));
-                        continue;
-                    }
-                    break;
-                }
-
-                let adapter = option_adapter.unwrap(); // simplify below code
-                let _ = adapter.wait_available().await;
-
-                info!("sending AmReadyIdle(...)");
-                resp.send(AmReadyIdle(format!("{:?}", &adapter))).ok();
-                connect_bt_id = None;
-
-                // NOTE: state 1b-of-4: idle (ready)
-                info!("btnus waiting for {:?}", DoScanStart("".into()));
-                loop {
-                    // Select between receiving the message or a 5-second timeout
-                    tokio::select! {
-                        Ok(msg) = cmd.recv_async() => {
-                            info!("recv'd: {:?}", msg);
-                            match msg {
-                                DoQuit => {
-                                    do_quit = true;
-                                    break;
-                                }
-                                DoScanStart(_opts) => {
-                                    connect_bt_id = None;
-                                    break;
-                                }
-                                DoConnect(bt_id) => {
-                                    connect_bt_id = Some(bt_id);
-                                    break;
-                                }
-                                unh => {
-                                    warn!("unhandled message waiting for DoScanStart(_) = {unh:?}");
-                                }
-                            }
-                        },
-                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
-                            debug!("Timed out!");
+                match sm.state() {
+                    BleStates::AmNotReady => {
+                        sm.context_mut().adapter = Adapter::default().await;
+                        if sm.context().adapter.is_some() {
+                            let _ = sm.process_event(BleEvents::DoGetReady);
+                        } else {
+                            let _ = sm.context_mut().resp.send(AmNotReady);
+                            tokio::time::sleep(Duration::from_millis(1000)).await;
                         }
                     }
-                }
-                if do_quit {
-                    break;
-                }
 
-                // NOTE: state 2-of-4: scanning
-
-                // NOTE: putting scan in its own scope has the effect...
-                //       when the the scan stream is dropped
-                //       the BT scan operations will stop
-                // TODO: put this scan behavior in its own async fn
-                //       this async fn could return a device_id if given a &mut (mutable reference) to cmd_recv
-
-                // if connect_bt_id is None, then let's scan!
-                if connect_bt_id.is_none() {
-                    info!("starting scan");
-                    let scan = adapter.scan(&[]).await;
-                    if scan.is_err() {
-                        resp.send(AmNotReady).ok();
-                        std::thread::sleep(Duration::from_millis(1000));
-                        continue;
-                    }
-                    let mut scan = scan.unwrap();
-                    resp.send(AmScanning).ok();
-
-                    // if scan.is
-                    // match
-                    info!("scan started");
-
-                    loop {
+                    BleStates::AmReadyIdle => {
                         tokio::select! {
-                            Ok(msg) = cmd.recv_async() => {
-                                match msg {
-                                    DoQuit => {
-                                        do_quit = true;
-                                        break;
-                                    }
-                                    DoScanStop => {
-                                        info!("scan: recv'd DoScanStop, stopping scan");
-                                        break;
-                                    }
-                                    // TODO: handle connect
-                                    DoConnect(device_id) => {
-                                        info!("scan: recv'd DoConnect, doing connect + stopping scan");
-                                        connect_bt_id = Some(device_id);
-                                        break;
-                                    }
-                                    unhandled => {
-                                        warn!("scan: unhandled = {unhandled:?}");
-                                    }
-                                }
+                            Ok(msg) = sm.context_mut().cmd.recv_async() => {
+                                handle_event(&mut sm, msg);
                             },
-                            Some(discovered_device) = scan.next() => {
-                                // TODO: put this timeout recv in a helper for readability
-                                // TODO: check if the sync method recv_timeout works just fine in here... it
-                                // should...
-                                let k = discovered_device.device.id();
-                                let device = discovered_device.device.clone();
-                                scan_map.insert(k, device);
-
-                                resp.send(DataScanResult(vec![discovered_device.clone()]))
-                                    .ok();
-                            },
-                            _ = tokio::time::sleep(tokio::time::Duration::from_secs_f32(0.5)) => {
+                            _ = tokio::time::sleep(Duration::from_secs(5)) => {
                                 debug!("Timed out!");
                             }
-                        } // end: tokio select!
-                    } // end scan loop
-                    info!("scan stopped");
-                } // end start-scan, i.e. if connect_bt_id.is_none()
-
-                // NOTE: state 3-of-4: connecting
-                match connect_bt_id {
-                    Some(bt_id) => {
-                        let _ = resp.send(AmConnecting);
-                        // NOTE: state 4-of-4: connected (handled inside async fn)
-                        match bt_nus_setup_and_loop(&adapter, &bt_id, &cmd, &resp).await {
-                            Ok(ok_do_quit) => {
-                                info!("succesful disconnect");
-                                if ok_do_quit {
-                                    // do_quit = true;
-                                    // WARN: this *should* break the forever loop
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                error!("bad disconnect : {e}");
-                            }
                         }
                     }
-                    None => {
-                        // nothing to do?
+
+                    BleStates::AmScanning => {
+                        let (connect_bt_id, scan_map, do_scan_stop, do_quit, scan_failed) = {
+                            let mut connect_bt_id: Option<DeviceId> = None;
+                            let mut scan_map: HashMap<DeviceId, Device> = HashMap::new();
+                            let mut do_scan_stop = false;
+                            let mut do_quit = false;
+                            let mut scan_failed = false;
+                            
+                            let scan_opt = {
+                                let ctx = sm.context();
+                                ctx.adapter.as_ref().unwrap().scan(&[]).await.ok()
+                            };
+                            
+                            if let Some(mut scan) = scan_opt {
+                                {
+                                    let ctx = sm.context();
+                                    let cmd = &ctx.cmd;
+                                    let resp = &ctx.resp;
+
+                                    loop {
+                                        tokio::select! {
+                                            Ok(msg) = cmd.recv_async() => {
+                                                info!("recv'd: {:?}", msg);
+                                                match msg {
+                                                    DoQuit => {
+                                                        do_quit = true;
+                                                        break;
+                                                    }
+                                                    DoScanStop => {
+                                                        info!("scan: recv'd DoScanStop, stopping scan");
+                                                        do_scan_stop = true;
+                                                        break;
+                                                    }
+                                                    DoConnect(device_id) => {
+                                                        info!("scan: recv'd DoConnect, doing connect + stopping scan");
+                                                        connect_bt_id = Some(device_id);
+                                                        break;
+                                                    }
+                                                    unhandled => {
+                                                        warn!("scan: unhandled = {unhandled:?}");
+                                                    }
+                                                }
+                                            },
+                                            Some(discovered_device) = scan.next() => {
+                                                let k = discovered_device.device.id();
+                                                let device = discovered_device.device.clone();
+                                                let _ = resp.send(DataScanResult(vec![discovered_device.clone()]));
+                                                scan_map.insert(k, device);
+                                            },
+                                            _ = tokio::time::sleep(Duration::from_secs_f32(0.5)) => {
+                                                debug!("Timed out!");
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                scan_failed = true;
+                            }
+                            
+                            (connect_bt_id, scan_map, do_scan_stop, do_quit, scan_failed)
+                        };
+                        
+                        sm.context_mut().scan_map = scan_map;
+                        
+                        if scan_failed {
+                            let _ = sm.process_event(BleEvents::DoDisconnect);
+                        } else if do_quit {
+                            let _ = sm.process_event(BleEvents::DoQuit);
+                        } else if do_scan_stop {
+                            let _ = sm.process_event(BleEvents::DoScanStop);
+                        } else if connect_bt_id.is_some() {
+                            sm.context_mut().connect_bt_id = connect_bt_id;
+                            let _ = sm.process_event(BleEvents::DoConnect(sm.context().connect_bt_id.clone().unwrap()));
+                        }
+                    }
+
+                    BleStates::AmConnecting => {
+                        let bt_id = sm.context().connect_bt_id.clone();
+                        if let Some(bt_id) = bt_id {
+                            let adapter = sm.context().adapter.as_ref().unwrap();
+                            let cmd = &sm.context().cmd;
+                            let resp = &sm.context().resp;
+                            match bt_nus_setup_and_loop(adapter, &bt_id, cmd, resp).await {
+                                Ok(ok_do_quit) => {
+                                    info!("successful disconnect");
+                                    if ok_do_quit {
+                                        let _ = sm.process_event(BleEvents::DoQuit);
+                                    } else {
+                                        let _ = sm.process_event(BleEvents::ConnectComplete);
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("bad disconnect : {e}");
+                                    let _ = sm.process_event(BleEvents::DoDisconnect);
+                                }
+                            }
+                        } else {
+                            let _ = sm.process_event(BleEvents::DoDisconnect);
+                        }
+                    }
+
+                    BleStates::AmConnected => {
+                        let _ = sm.process_event(BleEvents::DoDisconnect);
+                    }
+
+                    BleStates::AmQuitted => {
+                        break;
                     }
                 }
-            } // outer forever loop
-            let _ = resp.send(AmQuitted); // FIXME: check result
+            }
+
             info!("sent AmQuitted");
-        }); // end rt.block_on ...
-        None // return None to satisfy JoinHandle<Option<u32>>
-    }) // returning spawned thread handle;
+        });
+        None
+    })
 } // end fn spawn_btnus_thread
 
 #[cfg(test)]
